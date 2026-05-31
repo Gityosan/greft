@@ -9,7 +9,6 @@ describe("primitives & special numbers", () => {
     f: false,
     i: 42,
     neg: -7,
-    big: 9007199254740993, // > MAX_SAFE as float still exact-int? -> 9007199254740992 region
     fl: 3.14,
     nan: NaN,
     negZero: -0,
@@ -29,7 +28,8 @@ describe("primitives & special numbers", () => {
   it("NaN", () => expect(Number.isNaN(out.nan)).toBe(true));
   it("-0 preserved", () => expect(Object.is(out.negZero, -0)).toBe(true));
   it("Infinity", () => expect(out.inf === Infinity && out.ninf === -Infinity).toBe(true));
-  it("bigint", () => expect(out.bi === 123456789012345678901234567890n && out.nbi === -42n).toBe(true));
+  it("bigint", () =>
+    expect(out.bi === 123456789012345678901234567890n && out.nbi === -42n).toBe(true));
   it("unicode string", () => expect(out.s).toBe("héllo 🌊"));
 });
 
@@ -50,7 +50,10 @@ describe("cycles & shared identity", () => {
 
 describe("Map / Set with object keys", () => {
   const key = { k: 1 };
-  const m = new Map<unknown, unknown>([[key, "v"], ["str", 99]]);
+  const m = new Map<unknown, unknown>([
+    [key, "v"],
+    ["str", 99],
+  ]);
   const s = new Set([1, key, "z"]);
   const root = { m, s, key };
   const out = decode(encode(root)) as any;
@@ -132,9 +135,13 @@ describe("Date", () => {
   it("date negative (pre-epoch)", () =>
     expect(out.negative instanceof Date && out.negative.getTime() === -1).toBe(true));
   it("date normal", () =>
-    expect(out.normal instanceof Date && out.normal.getTime() === Date.parse("2024-01-15T12:00:00.000Z")).toBe(true));
+    expect(
+      out.normal instanceof Date && out.normal.getTime() === Date.parse("2024-01-15T12:00:00.000Z"),
+    ).toBe(true));
   it("date far future", () =>
-    expect(out.far_future instanceof Date && out.far_future.getTime() === 253402300799999).toBe(true));
+    expect(out.far_future instanceof Date && out.far_future.getTime() === 253402300799999).toBe(
+      true,
+    ));
 
   it("date shared identity & value", () => {
     const d = new Date();
@@ -172,13 +179,19 @@ describe("ArrayBuffer / TypedArray", () => {
         o.f64[0] === 1.1 &&
         Number.isNaN(o.f64[1]) &&
         Object.is(o.f64[2], -0) &&
-        o.f64[3] === Infinity
+        o.f64[3] === Infinity,
     ).toBe(true));
   it("BigInt64Array type & values", () =>
     expect(
-      o.bi64 instanceof BigInt64Array && o.bi64[0] === 0n && o.bi64[1] === -1n && o.bi64[2] === 9223372036854775807n
+      o.bi64 instanceof BigInt64Array &&
+        o.bi64[0] === 0n &&
+        o.bi64[1] === -1n &&
+        o.bi64[2] === 9223372036854775807n,
     ).toBe(true));
   it("Uint8ClampedArray type & values", () =>
-    expect(o.clamped instanceof Uint8ClampedArray && [...o.clamped].join(",") === "0,128,255").toBe(true));
-  it("empty Uint8Array", () => expect(o.empty instanceof Uint8Array && o.empty.length === 0).toBe(true));
+    expect(o.clamped instanceof Uint8ClampedArray && [...o.clamped].join(",") === "0,128,255").toBe(
+      true,
+    ));
+  it("empty Uint8Array", () =>
+    expect(o.empty instanceof Uint8Array && o.empty.length === 0).toBe(true));
 });

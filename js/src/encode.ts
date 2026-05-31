@@ -15,7 +15,7 @@ interface Node {
 const wellKnownSymbols = new Map<symbol, string>(
   (Object.getOwnPropertyNames(Symbol) as Array<keyof typeof Symbol>)
     .filter((n) => typeof (Symbol as any)[n] === "symbol")
-    .map((n) => [(Symbol as any)[n] as symbol, String(n)])
+    .map((n) => [(Symbol as any)[n] as symbol, String(n)]),
 );
 
 export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
@@ -86,10 +86,11 @@ export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
 
   function buildSymbol(sym: symbol): Node {
     const wk = wellKnownSymbols.get(sym);
-    if (wk) return leaf((w) => {
-      w.u8(Tag.SymbolWellKnown);
-      w.str(wk);
-    });
+    if (wk)
+      return leaf((w) => {
+        w.u8(Tag.SymbolWellKnown);
+        w.str(wk);
+      });
     const key = Symbol.keyFor(sym);
     if (key !== undefined) {
       return leaf((w) => {
@@ -197,7 +198,7 @@ export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
     // Plain object: own enumerable string + symbol keys.
     const stringKeys = Object.keys(obj);
     const symKeys = Object.getOwnPropertySymbols(obj).filter(
-      (s) => Object.getOwnPropertyDescriptor(obj, s)?.enumerable
+      (s) => Object.getOwnPropertyDescriptor(obj, s)?.enumerable,
     );
     const props: Array<{ kind: KeyKind; key: string | number; val: number }> = [];
     for (const k of stringKeys) {

@@ -11,7 +11,7 @@ interface DecodedNode {
 const wellKnownByName = new Map<string, symbol>(
   (Object.getOwnPropertyNames(Symbol) as Array<keyof typeof Symbol>)
     .filter((n) => typeof (Symbol as any)[n] === "symbol")
-    .map((n) => [String(n), (Symbol as any)[n] as symbol])
+    .map((n) => [String(n), (Symbol as any)[n] as symbol]),
 );
 
 export function decode(bytes: Uint8Array): unknown {
@@ -96,7 +96,8 @@ function readNode(r: ByteReader): DecodedNode {
         value: obj,
         fill: (resolve) => {
           for (const p of props) {
-            const k = p.kind === KeyKind.String ? (p.key as string) : (resolve(p.key as number) as symbol);
+            const k =
+              p.kind === KeyKind.String ? (p.key as string) : (resolve(p.key as number) as symbol);
             obj[k] = resolve(p.val);
           }
         },
