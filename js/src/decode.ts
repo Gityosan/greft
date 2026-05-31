@@ -1,0 +1,162 @@
+import { ByteReader } from "./buffer.js";
+import { MAGIC, VERSION, Tag, KeyKind } from "./format.js";
+
+type Filler = (resolve: (idx: number) => unknown) => void;
+
+interface DecodedNode {
+  value: unknown;
+  fill?: Filler;
+}
+
+const wellKnownByName = new Map<string, symbol>(
+  (Object.getOwnPropertyNames(Symbol) as Array<keyof typeof Symbol>)
+    .filter((n) => typeof (Symbol as any)[n] === "symbol")
+    .map((n) => [String(n), (Symbol as any)[n] as symbol])
+);
+
+export function decode(bytes: Uint8Array): unknown {
+  const r = new ByteReader(bytes);
+  const magic = r.bytes(MAGIC.length);
+  for (let i = 0; i < MAGIC.length; i++) {
+    if (magic[i] !== MAGIC[i]) throw new Error("bad magic: not an LXF file");
+  }
+  const version = r.u8();
+  if (version !== VERSION) throw new Error("unsupported version: " + version);
+  const rootId = r.uvarintNum();
+  const count = r.uvarintNum();
+
+  const nodes: DecodedNode[] = new Array(count);
+  for (let i = 0; i < count; i++) nodes[i] = readNode(r);
+
+  const resolve = (idx: number): unknown => nodes[idx].value;
+  for (const n of nodes) n.fill?.(resolve);
+
+  return nodes[rootId].value;
+}
+
+function readNode(r: ByteReader): DecodedNode {
+  const tag = r.u8();
+  switch (tag) {
+    case Tag.Null:
+      return { value: null };
+    case Tag.Undefined:
+      return { value: undefined };
+    case Tag.BoolFalse:
+      return { value: false };
+    case Tag.BoolTrue:
+      return { value: true };
+    case Tag.Int:
+      return { value: Number(r.svarint()) };
+    case Tag.Float:
+      return { value: r.f64() };
+    case Tag.BigInt: {
+      const sign = r.u8();
+      const mag = r.uvarint();
+      return { value: sign ? -mag : mag };
+    }
+    case Tag.String:
+      return { value: r.str() };
+
+    case Tag.SymbolRegistered:
+      return { value: Symbol.for(r.str()) };
+    case Tag.SymbolUnique: {
+      const desc = r.str();
+      return { value: Symbol(desc) };
+    }
+    case Tag.SymbolWellKnown: {
+      const name = r.str();
+      const sym = wellKnownByName.get(name);
+      // Fallback: if unknown well-known on this runtime, make a unique symbol.
+      return { value: sym ?? Symbol(name) };
+    }
+
+    case Tag.Array: {
+      const n = r.uvarintNum();
+      const refs: number[] = [];
+      for (let i = 0; i < n; i++) refs.push(r.uvarintNum());
+      const arr: unknown[] = new Array(n);
+      return {
+        value: arr,
+        fill: (resolve) => {
+          for (let i = 0; i < n; i++) arr[i] = resolve(refs[i]);
+        },
+      };
+    }
+    case Tag.Object: {
+      const n = r.uvarintNum();
+      const props: Array<{ kind: KeyKind; key: string | number; val: number }> = [];
+      for (let i = 0; i < n; i++) {
+        const kind = r.u8() as KeyKind;
+        const key = kind === KeyKind.String ? r.str() : r.uvarintNum();
+        const val = r.uvarintNum();
+        props.push({ kind, key, val });
+      }
+      const obj: Record<string | symbol, unknown> = {};
+      return {
+        value: obj,
+        fill: (resolve) => {
+          for (const p of props) {
+            const k = p.kind === KeyKind.String ? (p.key as string) : (resolve(p.key as number) as symbol);
+            obj[k] = resolve(p.val);
+          }
+        },
+      };
+    }
+    case Tag.Map: {
+      const n = r.uvarintNum();
+      const pairs: Array<[number, number]> = [];
+      for (let i = 0; i < n; i++) pairs.push([r.uvarintNum(), r.uvarintNum()]);
+      const m = new Map<unknown, unknown>();
+      return {
+        value: m,
+        fill: (resolve) => {
+          for (const [k, v] of pairs) m.set(resolve(k), resolve(v));
+        },
+      };
+    }
+    case Tag.Set: {
+      const n = r.uvarintNum();
+      const refs: number[] = [];
+      for (let i = 0; i < n; i++) refs.push(r.uvarintNum());
+      const s = new Set<unknown>();
+      return {
+        value: s,
+        fill: (resolve) => {
+          for (const ref of refs) s.add(resolve(ref));
+        },
+      };
+    }
+    case Tag.WeakMap: {
+      const n = r.uvarintNum();
+      const pairs: Array<[number, number]> = [];
+      for (let i = 0; i < n; i++) pairs.push([r.uvarintNum(), r.uvarintNum()]);
+      const wm = new WeakMap<object, unknown>();
+      return {
+        value: wm,
+        fill: (resolve) => {
+          for (const [k, v] of pairs) {
+            const key = resolve(k);
+            if (typeof key === "object" && key !== null) wm.set(key, resolve(v));
+          }
+        },
+      };
+    }
+    case Tag.WeakSet: {
+      const n = r.uvarintNum();
+      const refs: number[] = [];
+      for (let i = 0; i < n; i++) refs.push(r.uvarintNum());
+      const ws = new WeakSet<object>();
+      return {
+        value: ws,
+        fill: (resolve) => {
+          for (const ref of refs) {
+            const v = resolve(ref);
+            if (typeof v === "object" && v !== null) ws.add(v);
+          }
+        },
+      };
+    }
+    default:
+      throw new Error("unknown tag: " + tag);
+  }
+}
