@@ -1,11 +1,18 @@
 import { ByteWriter } from "./buffer";
 import { MAGIC, VERSION, Tag, KeyKind, ElementType } from "./format";
+import type { TypeExtension } from "./extension";
 
 // Explicit contents for weak collections, since WeakMap/WeakSet are not
 // enumerable per spec. The caller supplies the entries they are holding.
 export interface WeakProvider {
   weakMapEntries?: (wm: WeakMap<object, unknown>) => Array<[object, unknown]>;
   weakSetValues?: (ws: WeakSet<object>) => object[];
+}
+
+export interface EncodeOptions {
+  provider?: WeakProvider;
+  /** Extension types for values the core would otherwise reject. */
+  types?: TypeExtension[];
 }
 
 interface Node {
@@ -18,7 +25,9 @@ const wellKnownSymbols = new Map<symbol, string>(
     .map((n) => [(Symbol as any)[n] as symbol, String(n)]),
 );
 
-export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
+export function encode(root: unknown, options: EncodeOptions = {}): Uint8Array {
+  const provider: WeakProvider = options.provider ?? {};
+  const types = options.types ?? [];
   const heap: Node[] = [];
   // identity map for objects/symbols (reference types)
   const ids = new Map<unknown, number>();
@@ -115,7 +124,51 @@ export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
     });
   }
 
+  // Own enumerable string + symbol properties, shared by Object and Error.
+  // `skip` excludes string keys handled out-of-band (Error's name/message/...).
+  type Prop = { kind: KeyKind; key: string | number; val: number };
+  function ownEntries(obj: object, skip?: Set<string>): Prop[] {
+    const props: Prop[] = [];
+    for (const k of Object.keys(obj)) {
+      if (skip?.has(k)) continue;
+      props.push({ kind: KeyKind.String, key: k, val: intern((obj as any)[k]) });
+    }
+    for (const s of Object.getOwnPropertySymbols(obj)) {
+      if (!Object.getOwnPropertyDescriptor(obj, s)?.enumerable) continue;
+      props.push({ kind: KeyKind.SymbolRef, key: intern(s), val: intern((obj as any)[s]) });
+    }
+    return props;
+  }
+  function writeEntries(w: ByteWriter, props: Prop[]): void {
+    w.uvarint(props.length);
+    for (const p of props) {
+      w.u8(p.kind);
+      if (p.kind === KeyKind.String) w.str(p.key as string);
+      else w.uvarint(p.key as number);
+      w.uvarint(p.val);
+    }
+  }
+  // True when `key` is a canonical array index within [0, length).
+  function isArrayIndex(key: string, length: number): boolean {
+    const n = Number(key);
+    return Number.isInteger(n) && n >= 0 && n < length && String(n) === key;
+  }
+
   function buildObject(obj: object): Node {
+    // Boxed primitives — unwrap to their primitive (best-effort; wrapper
+    // identity and any extra props are dropped, see FORMAT.md §9).
+    if (obj instanceof Number) return buildNumber(obj.valueOf());
+    if (obj instanceof String) {
+      const sv = obj.valueOf();
+      return leaf((w) => {
+        w.u8(Tag.String);
+        w.str(sv);
+      });
+    }
+    if (obj instanceof Boolean) {
+      const bv = obj.valueOf();
+      return leaf((w) => w.u8(bv ? Tag.BoolTrue : Tag.BoolFalse));
+    }
     // Date — leaf, checked before structural types.
     if (obj instanceof Date) {
       const ms = obj.getTime();
@@ -145,7 +198,27 @@ export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
         w.bytes(bytes);
       });
     }
+    // DataView — its own tag (NOT a TypedArray); stores the viewed window.
+    if (obj instanceof DataView) {
+      const bytes = new Uint8Array(obj.buffer, obj.byteOffset, obj.byteLength);
+      return leaf((w) => {
+        w.u8(Tag.DataView);
+        w.uvarint(bytes.length);
+        w.bytes(bytes);
+      });
+    }
     if (Array.isArray(obj)) {
+      // Arrays carry only their elements 0..length-1. Extra own enumerable
+      // properties cannot be represented, so reject rather than drop them.
+      const extra = [
+        ...Object.keys(obj).filter((k) => !isArrayIndex(k, obj.length)),
+        ...Object.getOwnPropertySymbols(obj)
+          .filter((s) => Object.getOwnPropertyDescriptor(obj, s)?.enumerable)
+          .map((s) => String(s)),
+      ];
+      if (extra.length > 0) {
+        throw new Error("array with non-index properties is not supported: " + extra.join(", "));
+      }
       // Iterate by index so holes in sparse arrays become explicit undefined.
       const refs: number[] = new Array(obj.length);
       for (let i = 0; i < obj.length; i++) refs[i] = intern((obj as unknown[])[i]);
@@ -195,27 +268,65 @@ export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
         for (const r of refs) w.uvarint(r);
       });
     }
+    // RegExp — leaf carrying its source pattern and flag string.
+    if (obj instanceof RegExp) {
+      return leaf((w) => {
+        w.u8(Tag.RegExp);
+        w.str(obj.source);
+        w.str(obj.flags);
+      });
+    }
+    // URL — leaf carrying the serialized href.
+    if (typeof URL !== "undefined" && obj instanceof URL) {
+      const href = obj.href;
+      return leaf((w) => {
+        w.u8(Tag.Url);
+        w.str(href);
+      });
+    }
+    // Error (and subclasses) — name + message + optional cause + extra props.
+    // `stack` is environment-derived and intentionally not encoded.
+    if (obj instanceof Error) {
+      const name = obj.name;
+      const message = obj.message;
+      const hasCause = Object.prototype.hasOwnProperty.call(obj, "cause");
+      const causeRef = hasCause ? intern((obj as { cause?: unknown }).cause) : 0;
+      const extra = ownEntries(obj, new Set(["name", "message", "stack", "cause"]));
+      return leaf((w) => {
+        w.u8(Tag.Error);
+        w.str(name);
+        w.str(message);
+        w.u8(hasCause ? 1 : 0);
+        if (hasCause) w.uvarint(causeRef);
+        writeEntries(w, extra);
+      });
+    }
+    // User-registered extension types claim otherwise-unsupported objects.
+    // The surrogate is interned as a child so it can be any Graft value.
+    for (const t of types) {
+      if (t.match(obj)) {
+        const ref = intern(t.encode(obj));
+        return leaf((w) => {
+          w.u8(Tag.Custom);
+          w.str(t.name);
+          w.uvarint(ref);
+        });
+      }
+    }
+    // Guard: only plain records (Object.prototype / null prototype) may fall
+    // through to the generic Object encoder. Any other exotic object would lose
+    // its internal state when reduced to own enumerable props, so we reject it
+    // loudly instead of silently emitting an empty/partial Object.
+    const proto = Object.getPrototypeOf(obj);
+    if (proto !== null && proto !== Object.prototype) {
+      const name = obj.constructor?.name ?? "object";
+      throw new Error("unsupported object type: " + name + " (no Graft tag for this exotic type)");
+    }
     // Plain object: own enumerable string + symbol keys.
-    const stringKeys = Object.keys(obj);
-    const symKeys = Object.getOwnPropertySymbols(obj).filter(
-      (s) => Object.getOwnPropertyDescriptor(obj, s)?.enumerable,
-    );
-    const props: Array<{ kind: KeyKind; key: string | number; val: number }> = [];
-    for (const k of stringKeys) {
-      props.push({ kind: KeyKind.String, key: k, val: intern((obj as any)[k]) });
-    }
-    for (const s of symKeys) {
-      props.push({ kind: KeyKind.SymbolRef, key: intern(s), val: intern((obj as any)[s]) });
-    }
+    const props = ownEntries(obj);
     return leaf((w) => {
       w.u8(Tag.Object);
-      w.uvarint(props.length);
-      for (const p of props) {
-        w.u8(p.kind);
-        if (p.kind === KeyKind.String) w.str(p.key as string);
-        else w.uvarint(p.key as number);
-        w.uvarint(p.val);
-      }
+      writeEntries(w, props);
     });
   }
 

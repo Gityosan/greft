@@ -1,0 +1,107 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "basic",
+          "value": {
+            "$ref": 1
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "typed",
+          "value": {
+            "$ref": 2
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "with_cause",
+          "value": {
+            "$ref": 3
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "with_extra",
+          "value": {
+            "$ref": 5
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "renamed",
+          "value": {
+            "$ref": 6
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Error",
+      "name": "Error",
+      "message": "boom",
+      "hasCause": false,
+      "extra": []
+    },
+    {
+      "tag": "Error",
+      "name": "TypeError",
+      "message": "not a function",
+      "hasCause": false,
+      "extra": []
+    },
+    {
+      "tag": "Error",
+      "name": "Error",
+      "message": "outer",
+      "hasCause": true,
+      "cause": {
+        "$ref": 4
+      },
+      "extra": []
+    },
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "code",
+          "value": {
+            "$": "int",
+            "v": 42
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Error",
+      "name": "Error",
+      "message": "annotated",
+      "hasCause": false,
+      "extra": [
+        {
+          "keyKind": "string",
+          "key": "detail",
+          "value": {
+            "$": "string",
+            "v": "context"
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Error",
+      "name": "CustomError",
+      "message": "weird",
+      "hasCause": false,
+      "extra": []
+    }
+  ]
+}

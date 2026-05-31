@@ -1,0 +1,34 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "buffer",
+          "value": {
+            "$ref": 1
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "empty",
+          "value": {
+            "$ref": 2
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Bytes",
+      "hex": "01020304"
+    },
+    {
+      "tag": "Bytes",
+      "hex": ""
+    }
+  ]
+}

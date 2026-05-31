@@ -1,0 +1,96 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "map",
+          "value": {
+            "$ref": 1
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "set",
+          "value": {
+            "$ref": 3
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "shared_key",
+          "value": {
+            "$ref": 2
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Map",
+      "entries": [
+        {
+          "key": {
+            "$": "string",
+            "v": "string_key"
+          },
+          "value": {
+            "$": "int",
+            "v": 99
+          }
+        },
+        {
+          "key": {
+            "$ref": 2
+          },
+          "value": {
+            "$": "string",
+            "v": "object-keyed value"
+          }
+        },
+        {
+          "key": {
+            "$": "int",
+            "v": 42
+          },
+          "value": {
+            "$": "string",
+            "v": "number key"
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "k",
+          "value": {
+            "$": "int",
+            "v": 1
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Set",
+      "values": [
+        {
+          "$": "int",
+          "v": 1
+        },
+        {
+          "$": "string",
+          "v": "two"
+        },
+        {
+          "$ref": 2
+        }
+      ]
+    }
+  ]
+}

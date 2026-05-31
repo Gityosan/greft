@@ -1,0 +1,72 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "simple",
+          "value": {
+            "$ref": 1
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "flags",
+          "value": {
+            "$ref": 2
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "empty",
+          "value": {
+            "$ref": 3
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "unicode",
+          "value": {
+            "$ref": 4
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "special",
+          "value": {
+            "$ref": 5
+          }
+        }
+      ]
+    },
+    {
+      "tag": "RegExp",
+      "source": "abc",
+      "flags": ""
+    },
+    {
+      "tag": "RegExp",
+      "source": "ab+c",
+      "flags": "gi"
+    },
+    {
+      "tag": "RegExp",
+      "source": "(?:)",
+      "flags": ""
+    },
+    {
+      "tag": "RegExp",
+      "source": "\\p{Letter}+",
+      "flags": "u"
+    },
+    {
+      "tag": "RegExp",
+      "source": "[/\\\\]\"'\\n\\t",
+      "flags": ""
+    }
+  ]
+}

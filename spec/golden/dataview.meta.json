@@ -1,0 +1,34 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "view",
+          "value": {
+            "$ref": 1
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "empty",
+          "value": {
+            "$ref": 2
+          }
+        }
+      ]
+    },
+    {
+      "tag": "DataView",
+      "hex": "deadbeef"
+    },
+    {
+      "tag": "DataView",
+      "hex": ""
+    }
+  ]
+}

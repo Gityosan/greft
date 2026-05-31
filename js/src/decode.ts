@@ -1,11 +1,25 @@
 import { ByteReader } from "./buffer";
 import { MAGIC, VERSION, Tag, KeyKind, ElementType } from "./format";
+import type { TypeExtension } from "./extension";
 
 type Filler = (resolve: (idx: number) => unknown) => void;
 
 interface DecodedNode {
   value: unknown;
   fill?: Filler;
+  // Set for Tag.Custom: the value is produced lazily by the registered type's
+  // `decode` once its surrogate has been resolved.
+  custom?: { name: string; surrogateRef: number };
+  started?: boolean; // container fill has begun (re-entrant cycle guard)
+  resolving?: boolean; // custom reconstruction in progress (cycle detector)
+  done?: boolean; // custom value computed
+}
+
+export interface DecodeOptions {
+  /** Reconstructors for `Tag.Custom` nodes, matched by name. */
+  types?: TypeExtension[];
+  /** Reject streams declaring more than this many heap nodes (DoS guard). */
+  maxNodes?: number;
 }
 
 const wellKnownByName = new Map<string, symbol>(
@@ -14,7 +28,37 @@ const wellKnownByName = new Map<string, symbol>(
     .map((n) => [String(n), (Symbol as any)[n] as symbol]),
 );
 
-export function decode(bytes: Uint8Array): unknown {
+// Built-in Error constructors restorable by name; unknown names become a base
+// Error with `.name` set to the stored value.
+const errorCtors: Record<string, new (message?: string) => Error> = {
+  Error,
+  EvalError,
+  RangeError,
+  ReferenceError,
+  SyntaxError,
+  TypeError,
+  URIError,
+};
+function makeError(name: string, message: string): Error {
+  const Ctor = errorCtors[name];
+  if (Ctor) return new Ctor(message);
+  const e = new Error(message);
+  e.name = name;
+  return e;
+}
+
+// Assign an own enumerable data property. Uses defineProperty so a key of
+// "__proto__" becomes a real own property instead of mutating the prototype.
+function defineOwn(target: object, key: string | symbol, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+export function decode(bytes: Uint8Array, options: DecodeOptions = {}): unknown {
   const r = new ByteReader(bytes);
   const magic = r.bytes(MAGIC.length);
   for (let i = 0; i < MAGIC.length; i++) {
@@ -25,13 +69,50 @@ export function decode(bytes: Uint8Array): unknown {
   const rootId = r.uvarintNum();
   const count = r.uvarintNum();
 
+  // DoS hardening: every node is at least one byte (its tag), so a declared
+  // count larger than the remaining bytes is impossible — reject before
+  // allocating. `maxNodes` caps it further for callers reading untrusted input.
+  const maxNodes = options.maxNodes ?? bytes.length;
+  if (count > bytes.length) {
+    throw new Error("declared node count " + count + " exceeds available bytes");
+  }
+  if (count > maxNodes) {
+    throw new Error("node count " + count + " exceeds maxNodes " + maxNodes);
+  }
+  if (count > 0 && rootId >= count) {
+    throw new Error("root index " + rootId + " out of range");
+  }
+
+  const types = new Map((options.types ?? []).map((t) => [t.name, t]));
   const nodes: DecodedNode[] = new Array(count);
   for (let i = 0; i < count; i++) nodes[i] = readNode(r);
 
-  const resolve = (idx: number): unknown => nodes[idx].value;
-  for (const n of nodes) n.fill?.(resolve);
+  // Lazy, memoized resolution. Containers expose a stable placeholder object at
+  // parse time, so cycles/shared refs through them just work; Custom nodes are
+  // reconstructed on first access once their surrogate is resolved.
+  function resolve(idx: number): unknown {
+    if (idx < 0 || idx >= count) throw new Error("reference out of range: " + idx);
+    const n = nodes[idx];
+    if (n.custom) {
+      if (n.done) return n.value;
+      if (n.resolving) throw new Error("cycle through custom type: " + n.custom.name);
+      const type = types.get(n.custom.name);
+      if (!type) throw new Error("no registered type for: " + n.custom.name);
+      n.resolving = true;
+      n.value = type.decode(resolve(n.custom.surrogateRef));
+      n.resolving = false;
+      n.done = true;
+      return n.value;
+    }
+    if (n.fill && !n.started) {
+      n.started = true;
+      n.fill(resolve);
+    }
+    return n.value;
+  }
 
-  return nodes[rootId].value;
+  for (let i = 0; i < count; i++) resolve(i);
+  return count > 0 ? resolve(rootId) : undefined;
 }
 
 function readNode(r: ByteReader): DecodedNode {
@@ -98,7 +179,7 @@ function readNode(r: ByteReader): DecodedNode {
           for (const p of props) {
             const k =
               p.kind === KeyKind.String ? (p.key as string) : (resolve(p.key as number) as symbol);
-            obj[k] = resolve(p.val);
+            defineOwn(obj, k, resolve(p.val));
           }
         },
       };
@@ -188,6 +269,60 @@ function readNode(r: ByteReader): DecodedNode {
       const Ctor = ctors[et];
       if (!Ctor) throw new Error("unknown element type: " + et);
       return { value: new Ctor(buf) };
+    }
+    case Tag.RegExp: {
+      const source = r.str();
+      const flags = r.str();
+      return { value: new RegExp(source, flags) };
+    }
+    case Tag.Url: {
+      return { value: new URL(r.str()) };
+    }
+    case Tag.DataView: {
+      const len = r.uvarintNum();
+      const raw = r.bytes(len);
+      const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + len) as ArrayBuffer;
+      return { value: new DataView(buf) };
+    }
+    case Tag.Error: {
+      const name = r.str();
+      const message = r.str();
+      const flags = r.u8();
+      const hasCause = (flags & 1) !== 0;
+      const causeRef = hasCause ? r.uvarintNum() : -1;
+      const n = r.uvarintNum();
+      const props: Array<{ kind: KeyKind; key: string | number; val: number }> = [];
+      for (let i = 0; i < n; i++) {
+        const kind = r.u8() as KeyKind;
+        const key = kind === KeyKind.String ? r.str() : r.uvarintNum();
+        const val = r.uvarintNum();
+        props.push({ kind, key, val });
+      }
+      const err = makeError(name, message);
+      return {
+        value: err,
+        fill: (resolve) => {
+          if (hasCause) {
+            // Match the ECMAScript `{ cause }` option: own, non-enumerable.
+            Object.defineProperty(err, "cause", {
+              value: resolve(causeRef),
+              writable: true,
+              configurable: true,
+              enumerable: false,
+            });
+          }
+          for (const p of props) {
+            const k =
+              p.kind === KeyKind.String ? (p.key as string) : (resolve(p.key as number) as symbol);
+            defineOwn(err, k, resolve(p.val));
+          }
+        },
+      };
+    }
+    case Tag.Custom: {
+      const name = r.str();
+      const surrogateRef = r.uvarintNum();
+      return { value: undefined, custom: { name, surrogateRef } };
     }
     default:
       throw new Error("unknown tag: " + tag);

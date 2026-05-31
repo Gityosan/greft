@@ -1,0 +1,44 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "empty",
+          "value": {
+            "$": "string",
+            "v": ""
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "ascii",
+          "value": {
+            "$": "string",
+            "v": "hello world"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "multibyte",
+          "value": {
+            "$": "string",
+            "v": "héllo こんにちは"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "emoji",
+          "value": {
+            "$": "string",
+            "v": "🌊🚀✨"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "uint8",
+          "value": {
+            "$ref": 1
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "uint8_clamped",
+          "value": {
+            "$ref": 2
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "uint16",
+          "value": {
+            "$ref": 3
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "uint32",
+          "value": {
+            "$ref": 4
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "int8",
+          "value": {
+            "$ref": 5
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "int16",
+          "value": {
+            "$ref": 6
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "int32",
+          "value": {
+            "$ref": 7
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "float32",
+          "value": {
+            "$ref": 8
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "float64",
+          "value": {
+            "$ref": 9
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "bigint64",
+          "value": {
+            "$ref": 10
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "biguint64",
+          "value": {
+            "$ref": 11
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "empty",
+          "value": {
+            "$ref": 12
+          }
+        }
+      ]
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Uint8",
+      "hex": "007fff"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Uint8Clamped",
+      "hex": "0080ff"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Uint16",
+      "hex": "00000001ffff"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Uint32",
+      "hex": "0000000000000100ffffffff"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Int8",
+      "hex": "80007f"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Int16",
+      "hex": "00800000ff7f"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Int32",
+      "hex": "0000008000000000ffffff7f"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Float32",
+      "hex": "0000c03f000000800000807f"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Float64",
+      "hex": "9a9999999999f13f000000000000f87f0000000000000080000000000000f07f"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "BigInt64",
+      "hex": "0000000000000000ffffffffffffffffffffffffffffff7f"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "BigUint64",
+      "hex": "00000000000000000100000000000000ffffffffffffffff"
+    },
+    {
+      "tag": "TypedArray",
+      "element_type": "Uint8",
+      "hex": ""
+    }
+  ]
+}

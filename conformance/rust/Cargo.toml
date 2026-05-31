@@ -1,0 +1,22 @@
+[package]
+name = "graft-conformance"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Two well-known crates that don't touch the wire format's byte determinism:
+# serde_json parses the .meta.json sidecars, num-bigint handles arbitrary-
+# precision integers. The format primitives (varint / ZigZag / float-LE / UTF-8)
+# stay hand-written. CI fetches these from crates.io (Cargo.lock pins versions).
+
+[lib]
+name = "graft_conformance"
+path = "src/lib.rs"
+
+[[bin]]
+name = "graft-conformance"
+path = "src/main.rs"
+
+[dependencies]
+num-bigint = "0.4.6"
+serde_json = "1.0.150"

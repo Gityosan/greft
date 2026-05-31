@@ -115,6 +115,9 @@ Decoder algorithm (required for all implementations):
 | `BigInt`           | 6  | `u8(sign) + uvarint(magnitude)` | sign: 0=positive/zero, 1=negative. magnitude: absolute value. |
 | `String`           | 7  | `str`                           | UTF-8. |
 | `Bytes`            | 41 | `uvarint(len) + raw`            | Raw ArrayBuffer / byte string. No element type. Fallback: `[]byte` / `Vec<u8>` / `bytes`. |
+| `RegExp`           | 43 | `str(source) + str(flags)`      | JS `RegExp`. `source` is the pattern text, `flags` the flag string (e.g. `"gi"`). Fallback: object `{source, flags}` or a language-native regex if available. |
+| `Url`              | 44 | `str(href)`                     | JS `URL`. Serialized absolute URL string. Fallback: plain string. |
+| `DataView`         | 45 | `uvarint(len) + raw`            | JS `DataView` over its viewed window (`byteOffset … byteOffset+byteLength`). Distinct tag from `Bytes` so the view type survives. Fallback: `Bytes`. |
 
 ### 5.2 Symbol Nodes
 
@@ -241,6 +244,53 @@ Fallback (langs without WeakMap): Map.
 
 Fallback (langs without WeakSet): Set.
 
+### 5.7 Error Node (children: cause + extra properties)
+
+| Tag | Value | Payload |
+|-----|-------|---------|
+| `Error` | 46 | `str(name) + str(message) + u8(flags) [+ uvarint(cause_ref)] + uvarint(extra_count) + entry{extra_count}` |
+
+- `name`: the error's `name` (e.g. `"Error"`, `"TypeError"`). Decoders restore
+  the matching built-in constructor when `name` is one of `Error`, `EvalError`,
+  `RangeError`, `ReferenceError`, `SyntaxError`, `TypeError`, `URIError`;
+  otherwise a base `Error` whose `name` property is set to the stored value.
+- `message`: the error's `message` string.
+- `flags`: `bit0 = hasCause`. When set, `cause_ref` (a heap reference to an
+  arbitrary value) immediately follows. `cause` is restored as a
+  non-enumerable property, matching the ECMAScript `{ cause }` option.
+- `extra_count` + `entry{}`: any **own enumerable** properties (string- or
+  symbol-keyed), encoded exactly like `Object` entries (§5.5). The intrinsic
+  `name` / `message` / `stack` / `cause` slots are non-enumerable and never
+  appear here, so there is no double-encoding.
+- `stack` is **not** encoded — it is environment-derived, not portable data.
+  Decoders synthesize a fresh stack. This is the one documented exception to the
+  encoder's losslessness for `Error`.
+- Fallback (langs without a native error type): object
+  `{ name, message, cause?, ...extra }`.
+
+### 5.8 Custom Node (extension types)
+
+| Tag | Value | Payload |
+|-----|-------|---------|
+| `Custom` | 47 | `str(type_name) + uvarint(surrogate_ref)` |
+
+An escape hatch for values the core has no tag for (class instances, domain
+types, `Temporal.*`, …). The encoder consults a caller-supplied registry of
+**type extensions**; the first whose predicate matches a value claims it and
+maps it to a *surrogate* — any Graft-encodable value — stored as a heap
+reference. The decoder looks up `type_name` in its registry and reconstructs the
+value from the resolved surrogate.
+
+- `type_name`: stable identifier agreed on by both ends.
+- `surrogate_ref`: heap reference to the encoded surrogate.
+- Built-in types take precedence: an extension only applies to values not
+  already covered by tags 0–46.
+- Decoders must restore custom values lazily, after the surrogate is resolved. A
+  surrogate that references its own custom value (a cycle *through* the custom)
+  is unrepresentable and must raise an error.
+- Fallback (decoder without the named extension): a decode error — the value
+  cannot be reconstructed without the registered reconstructor.
+
 ---
 
 ## 6. Tag Summary Table
@@ -267,7 +317,12 @@ Fallback (langs without WeakSet): Set.
 | `Date`             | 40    | Extended    |
 | `Bytes`            | 41    | Extended    |
 | `TypedArray`       | 42    | Extended    |
-| 8–9, 13–19, 24–29, 32–39, 43–255 | — | **Reserved** |
+| `RegExp`           | 43    | Extended    |
+| `Url`              | 44    | Extended    |
+| `DataView`         | 45    | Extended    |
+| `Error`            | 46    | Extended    |
+| `Custom`           | 47    | Extension   |
+| 8–9, 13–19, 24–29, 32–39, 48–255 | — | **Reserved** |
 
 Reserved tags must cause a decode error: `unknown tag: N`.
 
@@ -291,8 +346,11 @@ A conforming implementation must:
 3. **Error** on unknown tags (reserved range) rather than silently skipping.
 4. **Pass** all golden test vectors in `spec/golden/`.
 
-Golden vector format: each `.bin` file contains one encoded value.  
-The corresponding `.meta.json` describes the expected decoded structure in a language-neutral notation (see `conformance/README.md`).
+Golden vector format: each `.bin` file contains one encoded value, paired with
+a `.meta.json` sidecar that mirrors the decoded heap in a language-neutral JSON
+notation (reference indices for shared identity / cycles, tagged leaf values).
+The sidecars are generated alongside the `.bin` files by the reference encoder;
+their schema is documented in `conformance/README.md` §2.
 
 ---
 
@@ -332,4 +390,33 @@ Int8Array → Uint8ClampedArray → Uint8Array →
 ArrayBuffer → ...
 ```
 
-`DataView` is intentionally excluded from TypedArray encoding.
+`DataView` has its own tag (§5.1, `DataView` = 45) and is **not** encoded as a
+TypedArray; the TypedArray path is for the eleven typed-array views only.
+
+### Boxed primitives (JS)
+
+`new Number(x)` / `new String(x)` / `new Boolean(x)` are unwrapped to their
+primitive value and encoded as `Int` / `Float` / `String` / `BoolTrue|False`.
+This is **best-effort**: wrapper-object identity and any extra own properties on
+the wrapper are dropped. Genuine primitives are unaffected.
+
+### Arrays with non-index properties (JS)
+
+`Array` encodes elements `0 … length-1` only. An array carrying additional own
+**enumerable** properties (e.g. `arr.foo = 1`, or an enumerable symbol key)
+cannot be represented without loss, so the encoder rejects it rather than
+silently dropping those properties. Convert to a plain object first if you need
+them preserved.
+
+### Exotic objects without a tag (JS)
+
+The encoder must not silently truncate objects it has no tag for. After the
+typed checks above, an object is encoded as a plain `Object` node **only** if
+its prototype is `Object.prototype` or `null` (i.e. a plain record or a
+null-prototype dictionary). Any other object whose internal state is not
+captured by a dedicated tag or its own enumerable properties — e.g. class
+instances, `Promise`, `WeakRef`, `Map`/`Set` subclasses with extra state —
+must raise an error rather than be written as an empty/partial `Object`. This
+keeps the "encoder → file is lossless" guarantee honest and is consistent with
+`function`, which is also rejected. Callers that want to serialize such a value
+should convert it to a supported shape first.

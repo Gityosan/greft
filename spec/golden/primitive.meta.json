@@ -1,0 +1,98 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "null",
+          "value": {
+            "$": "null"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "undefined",
+          "value": {
+            "$": "undefined"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "true",
+          "value": {
+            "$": "bool",
+            "v": true
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "false",
+          "value": {
+            "$": "bool",
+            "v": false
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "int",
+          "value": {
+            "$": "int",
+            "v": 42
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "negative_int",
+          "value": {
+            "$": "int",
+            "v": -7
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "float",
+          "value": {
+            "$": "float",
+            "v": 3.14
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "nan",
+          "value": {
+            "$": "float",
+            "v": "NaN"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "negative_zero",
+          "value": {
+            "$": "float",
+            "v": "-0"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "infinity",
+          "value": {
+            "$": "float",
+            "v": "Infinity"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "negative_infinity",
+          "value": {
+            "$": "float",
+            "v": "-Infinity"
+          }
+        }
+      ]
+    }
+  ]
+}

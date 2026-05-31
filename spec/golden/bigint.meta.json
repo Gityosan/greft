@@ -1,0 +1,36 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "zero",
+          "value": {
+            "$": "bigint",
+            "v": "0"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "positive",
+          "value": {
+            "$": "bigint",
+            "v": "123456789012345678901234567890"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "negative",
+          "value": {
+            "$": "bigint",
+            "v": "-987654321098765432109876543210"
+          }
+        }
+      ]
+    }
+  ]
+}

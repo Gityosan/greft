@@ -1,0 +1,58 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "well_known",
+          "value": {
+            "$ref": 1
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "unique_again",
+          "value": {
+            "$ref": 2
+          }
+        },
+        {
+          "keyKind": "symbol",
+          "key": {
+            "$ref": 3
+          },
+          "value": {
+            "$": "string",
+            "v": "registered value"
+          }
+        },
+        {
+          "keyKind": "symbol",
+          "key": {
+            "$ref": 2
+          },
+          "value": {
+            "$": "string",
+            "v": "unique value"
+          }
+        }
+      ]
+    },
+    {
+      "tag": "SymbolWellKnown",
+      "name": "iterator"
+    },
+    {
+      "tag": "SymbolUnique",
+      "description": "desc"
+    },
+    {
+      "tag": "SymbolRegistered",
+      "key": "app.id"
+    }
+  ]
+}
