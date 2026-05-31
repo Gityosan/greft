@@ -129,5 +129,70 @@ function check(name: string, cond: boolean): void {
   check("array hole -> undefined", out[1] === undefined);
 }
 
+// ---- Date ----
+{
+  const root = {
+    epoch: new Date(0),
+    negative: new Date(-1),
+    normal: new Date("2024-01-15T12:00:00.000Z"),
+    far_future: new Date(253402300799999),
+  };
+  const out = decode(encode(root)) as typeof root;
+  check("date epoch", out.epoch instanceof Date && out.epoch.getTime() === 0);
+  check("date negative (pre-epoch)", out.negative instanceof Date && out.negative.getTime() === -1);
+  check(
+    "date normal",
+    out.normal instanceof Date && out.normal.getTime() === Date.parse("2024-01-15T12:00:00.000Z")
+  );
+  check("date far future", out.far_future instanceof Date && out.far_future.getTime() === 253402300799999);
+
+  const d = new Date();
+  const idRoot = { a: d, b: d };
+  const idOut = decode(encode(idRoot)) as typeof idRoot;
+  check("date shared identity a === b", idOut.a === idOut.b);
+  check("date shared identity value", idOut.a.getTime() === d.getTime());
+}
+
+// ---- ArrayBuffer / TypedArray ----
+{
+  const ab = new ArrayBuffer(4);
+  new Uint8Array(ab).set([1, 2, 3, 4]);
+  const out = decode(encode({ ab })) as { ab: ArrayBuffer };
+  check("arraybuffer is ArrayBuffer", out.ab instanceof ArrayBuffer && out.ab.byteLength === 4);
+  check(
+    "arraybuffer bytes",
+    [...new Uint8Array(out.ab)].join(",") === "1,2,3,4"
+  );
+
+  const root = {
+    u8: new Uint8Array([0, 127, 255]),
+    i16: new Int16Array([-32768, 0, 32767]),
+    f64: new Float64Array([1.1, NaN, -0, Infinity]),
+    bi64: new BigInt64Array([0n, -1n, 9223372036854775807n]),
+    clamped: new Uint8ClampedArray([0, 128, 255]),
+    empty: new Uint8Array([]),
+  };
+  const o = decode(encode(root)) as typeof root;
+  check("Uint8Array type & values", o.u8 instanceof Uint8Array && [...o.u8].join(",") === "0,127,255");
+  check("Int16Array type & values", o.i16 instanceof Int16Array && [...o.i16].join(",") === "-32768,0,32767");
+  check(
+    "Float64Array type & special values",
+    o.f64 instanceof Float64Array &&
+      o.f64[0] === 1.1 &&
+      Number.isNaN(o.f64[1]) &&
+      Object.is(o.f64[2], -0) &&
+      o.f64[3] === Infinity
+  );
+  check(
+    "BigInt64Array type & values",
+    o.bi64 instanceof BigInt64Array && o.bi64[0] === 0n && o.bi64[1] === -1n && o.bi64[2] === 9223372036854775807n
+  );
+  check(
+    "Uint8ClampedArray type & values",
+    o.clamped instanceof Uint8ClampedArray && [...o.clamped].join(",") === "0,128,255"
+  );
+  check("empty Uint8Array", o.empty instanceof Uint8Array && o.empty.length === 0);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -31,6 +31,26 @@ export enum Tag {
   // ---- weak collections (children supplied via explicit input) ----
   WeakMap = 30, // count + count*(keyRef,valueRef)  [only resolvable entries]
   WeakSet = 31, // count + count*ref
+
+  // ---- extended leaves ----
+  Date = 40, // svarint(unix_ms) + svarint(sub_ms_nanos)
+  Bytes = 41, // uvarint(byte_length) + raw_bytes (ArrayBuffer)
+  TypedArray = 42, // u8(element_type) + uvarint(byte_length) + raw_bytes (LE)
+}
+
+// TypedArray element type codes (see FORMAT.md §5.4).
+export enum ElementType {
+  Uint8 = 0,
+  Uint8Clamped = 1,
+  Uint16 = 2,
+  Uint32 = 3,
+  Int8 = 4,
+  Int16 = 5,
+  Int32 = 6,
+  Float32 = 7,
+  Float64 = 8,
+  BigInt64 = 9,
+  BigUint64 = 10,
 }
 
 // Object key kinds, since JS object keys may be strings or symbols.

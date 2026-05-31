@@ -1,5 +1,5 @@
 import { ByteReader } from "./buffer.js";
-import { MAGIC, VERSION, Tag, KeyKind } from "./format.js";
+import { MAGIC, VERSION, Tag, KeyKind, ElementType } from "./format.js";
 
 type Filler = (resolve: (idx: number) => unknown) => void;
 
@@ -155,6 +155,38 @@ function readNode(r: ByteReader): DecodedNode {
           }
         },
       };
+    }
+    case Tag.Date: {
+      const ms = r.svarint();
+      r.svarint(); // sub_ms_nanos: JS では無視
+      return { value: new Date(Number(ms)) };
+    }
+    case Tag.Bytes: {
+      const len = r.uvarintNum();
+      const raw = r.bytes(len);
+      return { value: raw.buffer.slice(raw.byteOffset, raw.byteOffset + len) };
+    }
+    case Tag.TypedArray: {
+      const et = r.u8();
+      const len = r.uvarintNum();
+      const raw = r.bytes(len);
+      const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + len) as ArrayBuffer;
+      const ctors: Record<number, new (b: ArrayBuffer) => ArrayBufferView> = {
+        [ElementType.Uint8]: Uint8Array,
+        [ElementType.Uint8Clamped]: Uint8ClampedArray,
+        [ElementType.Uint16]: Uint16Array,
+        [ElementType.Uint32]: Uint32Array,
+        [ElementType.Int8]: Int8Array,
+        [ElementType.Int16]: Int16Array,
+        [ElementType.Int32]: Int32Array,
+        [ElementType.Float32]: Float32Array,
+        [ElementType.Float64]: Float64Array,
+        [ElementType.BigInt64]: BigInt64Array,
+        [ElementType.BigUint64]: BigUint64Array,
+      };
+      const Ctor = ctors[et];
+      if (!Ctor) throw new Error("unknown element type: " + et);
+      return { value: new Ctor(buf) };
     }
     default:
       throw new Error("unknown tag: " + tag);
