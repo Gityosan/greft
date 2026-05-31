@@ -142,14 +142,25 @@ Each language port gets its own subdirectory under `conformance/`:
 conformance/
   README.md            ← this file
   js/                  ← reference port (run.ts: decode + match against meta)
-  <lang>/              ← e.g. go/, rust/, python/, ruby/, cpp/
+  python/              ← stdlib-only decoder + runner (run.py)
+  rust/                ← zero-dependency decoder + runner (cargo test)
+  <lang>/              ← future ports e.g. go/, ruby/, cpp/
     README.md          ← how to build & run this port's conformance suite
     ...                ← decoder + a test runner over ../../spec/golden/
 ```
 
 The `js/` port reuses the reference decoder in `../../js/src` and implements the
 parallel-walk matcher described in §2; read [`js/run.ts`](./js/run.ts) as the
-worked example before porting to another language.
+worked example before porting to another language. The
+[`python/`](./python/) and [`rust/`](./rust/) ports are full independent
+decoders (they do **not** reuse the JS code) and show the same matcher in a
+dynamically- and a statically-typed language respectively.
+
+| Port   | Run command                          |
+|--------|--------------------------------------|
+| js     | `cd js && pnpm conformance`          |
+| python | `python3 conformance/python/run.py`  |
+| rust   | `cd conformance/rust && cargo test`  |
 
 Requirements for each `<lang>/`:
 

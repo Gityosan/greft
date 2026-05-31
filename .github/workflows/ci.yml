@@ -61,3 +61,24 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+  conformance-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Python conformance port
+        run: python3 conformance/python/run.py
+
+  conformance-rust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: conformance/rust
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Rust conformance port
+        run: cargo test
+

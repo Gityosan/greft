@@ -1,0 +1,17 @@
+[package]
+name = "graft-conformance"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Zero dependencies on purpose: the conformance port must build offline so CI
+# never needs crates.io. A minimal JSON parser for the .meta.json sidecars lives
+# in src/json.rs rather than pulling in serde.
+
+[lib]
+name = "graft_conformance"
+path = "src/lib.rs"
+
+[[bin]]
+name = "graft-conformance"
+path = "src/main.rs"
