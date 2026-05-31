@@ -144,7 +144,8 @@ conformance/
   js/                  ← reference port (run.ts: decode + match against meta)
   python/              ← stdlib-only decoder + runner (run.py)
   rust/                ← zero-dependency decoder + runner (cargo test)
-  <lang>/              ← future ports e.g. go/, ruby/, cpp/
+  go/                  ← stdlib-only decoder + runner (go test)
+  <lang>/              ← future ports e.g. ruby/, cpp/
     README.md          ← how to build & run this port's conformance suite
     ...                ← decoder + a test runner over ../../spec/golden/
 ```
@@ -152,15 +153,17 @@ conformance/
 The `js/` port reuses the reference decoder in `../../js/src` and implements the
 parallel-walk matcher described in §2; read [`js/run.ts`](./js/run.ts) as the
 worked example before porting to another language. The
-[`python/`](./python/) and [`rust/`](./rust/) ports are full independent
-decoders (they do **not** reuse the JS code) and show the same matcher in a
-dynamically- and a statically-typed language respectively.
+[`python/`](./python/), [`rust/`](./rust/), and [`go/`](./go/) ports are full
+independent decoders (they do **not** reuse the JS code) and show the same
+matcher across a dynamically-typed, a statically-typed systems, and a
+garbage-collected language.
 
 | Port   | Run command                          |
 |--------|--------------------------------------|
 | js     | `cd js && pnpm conformance`          |
 | python | `python3 conformance/python/run.py`  |
 | rust   | `cd conformance/rust && cargo test`  |
+| go     | `cd conformance/go && go test ./...` |
 
 Requirements for each `<lang>/`:
 
