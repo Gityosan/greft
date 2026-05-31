@@ -52,7 +52,7 @@ graft/
 
 ## 現在の実装状態
 
-### 完了済み（触らないこと）
+### 完了済み
 
 - `buffer.ts`: ByteWriter / ByteReader（uvarint, svarint, f64, str）
 - `format.ts`: Tag 0〜31（Null〜WeakSet）、KeyKind、MAGIC(`GRF1`)、VERSION
