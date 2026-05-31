@@ -107,7 +107,7 @@ describe("WeakMap / WeakSet via explicit provider", () => {
     weakSetValues: () => [k1],
   };
 
-  const out = decode(encode(root, provider)) as any;
+  const out = decode(encode(root, { provider })) as any;
 
   it("weakmap restores via reachable key identity", () => expect(out.wm.get(out.k1)).toBe("one"));
   it("weakmap second entry", () => expect(out.wm.get(out.k2)).toBe("two"));

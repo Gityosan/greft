@@ -76,12 +76,11 @@ describe("extension types (Tag.Custom)", () => {
     );
   });
 
-  it("legacy WeakProvider second arg still works alongside the new options shape", () => {
-    // encode(root, provider) must keep working (back-compat).
+  it("WeakProvider is supplied via options.provider", () => {
     const k = { id: 1 };
     const wm = new WeakMap<object, unknown>();
     const root = { wm, k };
-    const out = decode(encode(root, { weakMapEntries: () => [[k, "v"]] })) as {
+    const out = decode(encode(root, { provider: { weakMapEntries: () => [[k, "v"]] } })) as {
       wm: WeakMap<object, unknown>;
       k: object;
     };

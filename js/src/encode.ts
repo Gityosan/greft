@@ -25,15 +25,9 @@ const wellKnownSymbols = new Map<symbol, string>(
     .map((n) => [(Symbol as any)[n] as symbol, String(n)]),
 );
 
-function isWeakProvider(o: WeakProvider | EncodeOptions): o is WeakProvider {
-  return "weakMapEntries" in o || "weakSetValues" in o;
-}
-
-export function encode(root: unknown, options: WeakProvider | EncodeOptions = {}): Uint8Array {
-  // Backward compatible: the second argument may be a bare WeakProvider.
-  const opts: EncodeOptions = isWeakProvider(options) ? { provider: options } : options;
-  const provider: WeakProvider = opts.provider ?? {};
-  const types = opts.types ?? [];
+export function encode(root: unknown, options: EncodeOptions = {}): Uint8Array {
+  const provider: WeakProvider = options.provider ?? {};
+  const types = options.types ?? [];
   const heap: Node[] = [];
   // identity map for objects/symbols (reference types)
   const ids = new Map<unknown, number>();
