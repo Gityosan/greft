@@ -5,6 +5,9 @@
   "keywords": [],
   "license": "ISC",
   "author": "",
+  "bin": {
+    "graft": "./dist/cli.js"
+  },
   "files": [
     "dist"
   ],
