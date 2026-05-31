@@ -1,5 +1,5 @@
 {
-  "name": "greft",
+  "name": "greft-codec",
   "version": "0.1.0",
   "description": "Language-agnostic lossless binary serializer — encode in JS, decode in Python / Rust / Go / …. Zero runtime dependencies.",
   "keywords": [
