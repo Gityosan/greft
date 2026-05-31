@@ -8,7 +8,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { encode } from "../src/index.js";
+import { encode } from "../src/index";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const goldenDir = join(here, "..", "..", "spec", "golden");

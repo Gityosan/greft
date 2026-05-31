@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { encode, decode, type WeakProvider } from "../src/index.js";
+import { encode, decode, type WeakProvider } from "../src/index";
 
 describe("primitives & special numbers", () => {
   const v = {

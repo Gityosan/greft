@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
-import { encode, decode } from "../src/index.js";
+import { encode, decode } from "../src/index";
 
 // Property: decode(encode(x)) is structurally equal to x for any JSON-like
 // value graph. fast-check shrinks counter-examples to a minimal failing case.

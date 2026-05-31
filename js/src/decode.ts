@@ -1,5 +1,5 @@
-import { ByteReader } from "./buffer.js";
-import { MAGIC, VERSION, Tag, KeyKind, ElementType } from "./format.js";
+import { ByteReader } from "./buffer";
+import { MAGIC, VERSION, Tag, KeyKind, ElementType } from "./format";
 
 type Filler = (resolve: (idx: number) => unknown) => void;
 

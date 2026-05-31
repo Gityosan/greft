@@ -1,5 +1,5 @@
-import { ByteWriter } from "./buffer.js";
-import { MAGIC, VERSION, Tag, KeyKind, ElementType } from "./format.js";
+import { ByteWriter } from "./buffer";
+import { MAGIC, VERSION, Tag, KeyKind, ElementType } from "./format";
 
 // Explicit contents for weak collections, since WeakMap/WeakSet are not
 // enumerable per spec. The caller supplies the entries they are holding.
