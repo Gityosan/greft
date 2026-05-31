@@ -43,6 +43,7 @@
   },
   "scripts": {
     "build": "tsdown",
+    "prepublishOnly": "pnpm build",
     "test": "vitest run",
     "test:watch": "vitest",
     "conformance": "tsx ../conformance/js/run.ts",
