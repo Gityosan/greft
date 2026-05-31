@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-# Zero dependencies on purpose: the conformance port must build offline so CI
-# never needs crates.io. A minimal JSON parser for the .meta.json sidecars lives
-# in src/json.rs rather than pulling in serde.
+# Two well-known crates that don't touch the wire format's byte determinism:
+# serde_json parses the .meta.json sidecars, num-bigint handles arbitrary-
+# precision integers. The format primitives (varint / ZigZag / float-LE / UTF-8)
+# stay hand-written. CI fetches these from crates.io (Cargo.lock pins versions).
 
 [lib]
 name = "graft_conformance"
