@@ -1,0 +1,60 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "epoch",
+          "value": {
+            "$ref": 1
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "negative",
+          "value": {
+            "$ref": 2
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "normal",
+          "value": {
+            "$ref": 3
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "far_future",
+          "value": {
+            "$ref": 4
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Date",
+      "unix_ms": 0,
+      "sub_ms_nanos": 0
+    },
+    {
+      "tag": "Date",
+      "unix_ms": -1,
+      "sub_ms_nanos": 0
+    },
+    {
+      "tag": "Date",
+      "unix_ms": 1705320000000,
+      "sub_ms_nanos": 0
+    },
+    {
+      "tag": "Date",
+      "unix_ms": 253402300799999,
+      "sub_ms_nanos": 0
+    }
+  ]
+}

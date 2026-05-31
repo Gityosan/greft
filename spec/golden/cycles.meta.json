@@ -1,0 +1,100 @@
+{
+  "root": {
+    "$ref": 0
+  },
+  "nodes": [
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "a",
+          "value": {
+            "$ref": 1
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "b",
+          "value": {
+            "$ref": 2
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "x",
+          "value": {
+            "$ref": 3
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "y",
+          "value": {
+            "$ref": 3
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "name",
+          "value": {
+            "$": "string",
+            "v": "a"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "peer",
+          "value": {
+            "$ref": 2
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "self",
+          "value": {
+            "$ref": 1
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "name",
+          "value": {
+            "$": "string",
+            "v": "b"
+          }
+        },
+        {
+          "keyKind": "string",
+          "key": "peer",
+          "value": {
+            "$ref": 1
+          }
+        }
+      ]
+    },
+    {
+      "tag": "Object",
+      "entries": [
+        {
+          "keyKind": "string",
+          "key": "tag",
+          "value": {
+            "$": "string",
+            "v": "shared"
+          }
+        }
+      ]
+    }
+  ]
+}

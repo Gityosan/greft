@@ -115,6 +115,7 @@ Decoder algorithm (required for all implementations):
 | `BigInt`           | 6  | `u8(sign) + uvarint(magnitude)` | sign: 0=positive/zero, 1=negative. magnitude: absolute value. |
 | `String`           | 7  | `str`                           | UTF-8. |
 | `Bytes`            | 41 | `uvarint(len) + raw`            | Raw ArrayBuffer / byte string. No element type. Fallback: `[]byte` / `Vec<u8>` / `bytes`. |
+| `RegExp`           | 43 | `str(source) + str(flags)`      | JS `RegExp`. `source` is the pattern text, `flags` the flag string (e.g. `"gi"`). Fallback: object `{source, flags}` or a language-native regex if available. |
 
 ### 5.2 Symbol Nodes
 
@@ -267,7 +268,8 @@ Fallback (langs without WeakSet): Set.
 | `Date`             | 40    | Extended    |
 | `Bytes`            | 41    | Extended    |
 | `TypedArray`       | 42    | Extended    |
-| 8–9, 13–19, 24–29, 32–39, 43–255 | — | **Reserved** |
+| `RegExp`           | 43    | Extended    |
+| 8–9, 13–19, 24–29, 32–39, 44–255 | — | **Reserved** |
 
 Reserved tags must cause a decode error: `unknown tag: N`.
 
@@ -291,8 +293,11 @@ A conforming implementation must:
 3. **Error** on unknown tags (reserved range) rather than silently skipping.
 4. **Pass** all golden test vectors in `spec/golden/`.
 
-Golden vector format: each `.bin` file contains one encoded value.  
-The corresponding `.meta.json` describes the expected decoded structure in a language-neutral notation (see `conformance/README.md`).
+Golden vector format: each `.bin` file contains one encoded value, paired with
+a `.meta.json` sidecar that mirrors the decoded heap in a language-neutral JSON
+notation (reference indices for shared identity / cycles, tagged leaf values).
+The sidecars are generated alongside the `.bin` files by the reference encoder;
+their schema is documented in `conformance/README.md` §2.
 
 ---
 
@@ -333,3 +338,15 @@ ArrayBuffer → ...
 ```
 
 `DataView` is intentionally excluded from TypedArray encoding.
+
+### Exotic objects without a tag (JS)
+
+The encoder must not silently truncate objects it has no tag for. After the
+typed checks above, an object is encoded as a plain `Object` node **only** if
+its prototype is `Object.prototype` or `null` (i.e. a plain record or a
+null-prototype dictionary). Any other object whose internal state is not
+captured by its own enumerable properties — e.g. class instances, `Error`,
+`URL`, `Promise`, `DataView` — must raise an error rather than be written as an
+empty/partial `Object`. This keeps the "encoder → file is lossless" guarantee
+honest and is consistent with `function`, which is also rejected. Callers that
+want to serialize such a value should convert it to a supported shape first.

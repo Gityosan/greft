@@ -195,6 +195,23 @@ export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
         for (const r of refs) w.uvarint(r);
       });
     }
+    // RegExp — leaf carrying its source pattern and flag string.
+    if (obj instanceof RegExp) {
+      return leaf((w) => {
+        w.u8(Tag.RegExp);
+        w.str(obj.source);
+        w.str(obj.flags);
+      });
+    }
+    // Guard: only plain records (Object.prototype / null prototype) may fall
+    // through to the generic Object encoder. Any other exotic object would lose
+    // its internal state when reduced to own enumerable props, so we reject it
+    // loudly instead of silently emitting an empty/partial Object.
+    const proto = Object.getPrototypeOf(obj);
+    if (proto !== null && proto !== Object.prototype) {
+      const name = obj.constructor?.name ?? "object";
+      throw new Error("unsupported object type: " + name + " (no Graft tag for this exotic type)");
+    }
     // Plain object: own enumerable string + symbol keys.
     const stringKeys = Object.keys(obj);
     const symKeys = Object.getOwnPropertySymbols(obj).filter(

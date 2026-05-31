@@ -195,3 +195,52 @@ describe("ArrayBuffer / TypedArray", () => {
   it("empty Uint8Array", () =>
     expect(o.empty instanceof Uint8Array && o.empty.length === 0).toBe(true));
 });
+
+describe("RegExp", () => {
+  const root = {
+    simple: /abc/,
+    flags: /ab+c/gi,
+    empty: new RegExp(""),
+    unicode: /\p{Letter}+/u,
+    special: /[/\\]"'\n\t/,
+  };
+  const out = decode(encode(root)) as typeof root;
+
+  it("simple pattern", () =>
+    expect(
+      out.simple instanceof RegExp && out.simple.source === "abc" && out.simple.flags === "",
+    ).toBe(true));
+  it("source & flags preserved", () =>
+    expect(out.flags.source === "ab+c" && out.flags.flags === "gi").toBe(true));
+  it("empty pattern normalizes like RegExp", () =>
+    expect(out.empty instanceof RegExp && out.empty.source === new RegExp("").source).toBe(true));
+  it("unicode flag", () =>
+    expect(out.unicode.flags === "u" && out.unicode.test("héllo")).toBe(true));
+  it("escaped specials roundtrip", () =>
+    expect(out.special.source === /[/\\]"'\n\t/.source).toBe(true));
+
+  it("shared identity preserved", () => {
+    const re = /shared/g;
+    const idOut = decode(encode({ a: re, b: re })) as { a: RegExp; b: RegExp };
+    expect(idOut.a === idOut.b && idOut.a.source === "shared" && idOut.a.flags === "g").toBe(true);
+  });
+});
+
+describe("exotic objects are rejected, not silently truncated", () => {
+  it("plain object still encodes", () =>
+    expect((decode(encode({ ok: 1 })) as { ok: number }).ok).toBe(1));
+  it("null-prototype dictionary still encodes", () => {
+    const dict = Object.create(null) as Record<string, number>;
+    dict.k = 7;
+    expect((decode(encode(dict)) as { k: number }).k).toBe(7);
+  });
+  it("class instance throws", () => {
+    class Point {
+      constructor(public x = 1) {}
+    }
+    expect(() => encode(new Point())).toThrow(/unsupported object type: Point/);
+  });
+  it("Error throws", () =>
+    expect(() => encode(new Error("boom"))).toThrow(/unsupported object type/));
+  it("function throws", () => expect(() => encode(() => 1)).toThrow(/functions are out of scope/));
+});

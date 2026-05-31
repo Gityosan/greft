@@ -189,6 +189,11 @@ function readNode(r: ByteReader): DecodedNode {
       if (!Ctor) throw new Error("unknown element type: " + et);
       return { value: new Ctor(buf) };
     }
+    case Tag.RegExp: {
+      const source = r.str();
+      const flags = r.str();
+      return { value: new RegExp(source, flags) };
+    }
     default:
       throw new Error("unknown tag: " + tag);
   }

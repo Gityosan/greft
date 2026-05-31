@@ -36,6 +36,7 @@ export enum Tag {
   Date = 40, // svarint(unix_ms) + svarint(sub_ms_nanos)
   Bytes = 41, // uvarint(byte_length) + raw_bytes (ArrayBuffer)
   TypedArray = 42, // u8(element_type) + uvarint(byte_length) + raw_bytes (LE)
+  RegExp = 43, // str(source) + str(flags)
 }
 
 // TypedArray element type codes (see FORMAT.md §5.4).
