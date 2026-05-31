@@ -22,6 +22,7 @@
     "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
+    "conformance": "tsx ../conformance/js/run.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",

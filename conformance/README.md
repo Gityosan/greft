@@ -5,8 +5,8 @@ Graft binary format. The format itself is specified in
 [`../spec/FORMAT.md`](../spec/FORMAT.md) — that document is the single source of
 truth. This README only describes the *testing* contract.
 
-There is no implementation code here yet; this is the skeleton that future
-language ports build against.
+The [`js/`](./js/) port is the **reference implementation** of this contract —
+new language ports should mirror its structure and behaviour.
 
 ---
 
@@ -129,10 +129,15 @@ Each language port gets its own subdirectory under `conformance/`:
 ```
 conformance/
   README.md            ← this file
+  js/                  ← reference port (run.ts: decode + match against meta)
   <lang>/              ← e.g. go/, rust/, python/, ruby/, cpp/
     README.md          ← how to build & run this port's conformance suite
     ...                ← decoder + a test runner over ../../spec/golden/
 ```
+
+The `js/` port reuses the reference decoder in `../../js/src` and implements the
+parallel-walk matcher described in §2; read [`js/run.ts`](./js/run.ts) as the
+worked example before porting to another language.
 
 Requirements for each `<lang>/`:
 
