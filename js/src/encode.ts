@@ -1,11 +1,18 @@
 import { ByteWriter } from "./buffer";
 import { MAGIC, VERSION, Tag, KeyKind, ElementType } from "./format";
+import type { TypeExtension } from "./extension";
 
 // Explicit contents for weak collections, since WeakMap/WeakSet are not
 // enumerable per spec. The caller supplies the entries they are holding.
 export interface WeakProvider {
   weakMapEntries?: (wm: WeakMap<object, unknown>) => Array<[object, unknown]>;
   weakSetValues?: (ws: WeakSet<object>) => object[];
+}
+
+export interface EncodeOptions {
+  provider?: WeakProvider;
+  /** Extension types for values the core would otherwise reject. */
+  types?: TypeExtension[];
 }
 
 interface Node {
@@ -18,7 +25,15 @@ const wellKnownSymbols = new Map<symbol, string>(
     .map((n) => [(Symbol as any)[n] as symbol, String(n)]),
 );
 
-export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
+function isWeakProvider(o: WeakProvider | EncodeOptions): o is WeakProvider {
+  return "weakMapEntries" in o || "weakSetValues" in o;
+}
+
+export function encode(root: unknown, options: WeakProvider | EncodeOptions = {}): Uint8Array {
+  // Backward compatible: the second argument may be a bare WeakProvider.
+  const opts: EncodeOptions = isWeakProvider(options) ? { provider: options } : options;
+  const provider: WeakProvider = opts.provider ?? {};
+  const types = opts.types ?? [];
   const heap: Node[] = [];
   // identity map for objects/symbols (reference types)
   const ids = new Map<unknown, number>();
@@ -291,6 +306,18 @@ export function encode(root: unknown, provider: WeakProvider = {}): Uint8Array {
         if (hasCause) w.uvarint(causeRef);
         writeEntries(w, extra);
       });
+    }
+    // User-registered extension types claim otherwise-unsupported objects.
+    // The surrogate is interned as a child so it can be any Graft value.
+    for (const t of types) {
+      if (t.match(obj)) {
+        const ref = intern(t.encode(obj));
+        return leaf((w) => {
+          w.u8(Tag.Custom);
+          w.str(t.name);
+          w.uvarint(ref);
+        });
+      }
     }
     // Guard: only plain records (Object.prototype / null prototype) may fall
     // through to the generic Object encoder. Any other exotic object would lose

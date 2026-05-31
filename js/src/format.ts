@@ -40,6 +40,7 @@ export enum Tag {
   Url = 44, // str(href)
   DataView = 45, // uvarint(byte_length) + raw_bytes (viewed window)
   Error = 46, // str(name) + str(message) + u8(flags) [+ cause_ref] + extra entries
+  Custom = 47, // str(type_name) + surrogate_ref — user-registered extension type
 }
 
 // TypedArray element type codes (see FORMAT.md §5.4).

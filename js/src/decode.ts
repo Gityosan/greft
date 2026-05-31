@@ -1,11 +1,25 @@
 import { ByteReader } from "./buffer";
 import { MAGIC, VERSION, Tag, KeyKind, ElementType } from "./format";
+import type { TypeExtension } from "./extension";
 
 type Filler = (resolve: (idx: number) => unknown) => void;
 
 interface DecodedNode {
   value: unknown;
   fill?: Filler;
+  // Set for Tag.Custom: the value is produced lazily by the registered type's
+  // `decode` once its surrogate has been resolved.
+  custom?: { name: string; surrogateRef: number };
+  started?: boolean; // container fill has begun (re-entrant cycle guard)
+  resolving?: boolean; // custom reconstruction in progress (cycle detector)
+  done?: boolean; // custom value computed
+}
+
+export interface DecodeOptions {
+  /** Reconstructors for `Tag.Custom` nodes, matched by name. */
+  types?: TypeExtension[];
+  /** Reject streams declaring more than this many heap nodes (DoS guard). */
+  maxNodes?: number;
 }
 
 const wellKnownByName = new Map<string, symbol>(
@@ -44,7 +58,7 @@ function defineOwn(target: object, key: string | symbol, value: unknown): void {
   });
 }
 
-export function decode(bytes: Uint8Array): unknown {
+export function decode(bytes: Uint8Array, options: DecodeOptions = {}): unknown {
   const r = new ByteReader(bytes);
   const magic = r.bytes(MAGIC.length);
   for (let i = 0; i < MAGIC.length; i++) {
@@ -55,13 +69,50 @@ export function decode(bytes: Uint8Array): unknown {
   const rootId = r.uvarintNum();
   const count = r.uvarintNum();
 
+  // DoS hardening: every node is at least one byte (its tag), so a declared
+  // count larger than the remaining bytes is impossible — reject before
+  // allocating. `maxNodes` caps it further for callers reading untrusted input.
+  const maxNodes = options.maxNodes ?? bytes.length;
+  if (count > bytes.length) {
+    throw new Error("declared node count " + count + " exceeds available bytes");
+  }
+  if (count > maxNodes) {
+    throw new Error("node count " + count + " exceeds maxNodes " + maxNodes);
+  }
+  if (count > 0 && rootId >= count) {
+    throw new Error("root index " + rootId + " out of range");
+  }
+
+  const types = new Map((options.types ?? []).map((t) => [t.name, t]));
   const nodes: DecodedNode[] = new Array(count);
   for (let i = 0; i < count; i++) nodes[i] = readNode(r);
 
-  const resolve = (idx: number): unknown => nodes[idx].value;
-  for (const n of nodes) n.fill?.(resolve);
+  // Lazy, memoized resolution. Containers expose a stable placeholder object at
+  // parse time, so cycles/shared refs through them just work; Custom nodes are
+  // reconstructed on first access once their surrogate is resolved.
+  function resolve(idx: number): unknown {
+    if (idx < 0 || idx >= count) throw new Error("reference out of range: " + idx);
+    const n = nodes[idx];
+    if (n.custom) {
+      if (n.done) return n.value;
+      if (n.resolving) throw new Error("cycle through custom type: " + n.custom.name);
+      const type = types.get(n.custom.name);
+      if (!type) throw new Error("no registered type for: " + n.custom.name);
+      n.resolving = true;
+      n.value = type.decode(resolve(n.custom.surrogateRef));
+      n.resolving = false;
+      n.done = true;
+      return n.value;
+    }
+    if (n.fill && !n.started) {
+      n.started = true;
+      n.fill(resolve);
+    }
+    return n.value;
+  }
 
-  return nodes[rootId].value;
+  for (let i = 0; i < count; i++) resolve(i);
+  return count > 0 ? resolve(rootId) : undefined;
 }
 
 function readNode(r: ByteReader): DecodedNode {
@@ -267,6 +318,11 @@ function readNode(r: ByteReader): DecodedNode {
           }
         },
       };
+    }
+    case Tag.Custom: {
+      const name = r.str();
+      const surrogateRef = r.uvarintNum();
+      return { value: undefined, custom: { name, surrogateRef } };
     }
     default:
       throw new Error("unknown tag: " + tag);

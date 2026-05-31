@@ -268,6 +268,29 @@ Fallback (langs without WeakSet): Set.
 - Fallback (langs without a native error type): object
   `{ name, message, cause?, ...extra }`.
 
+### 5.8 Custom Node (extension types)
+
+| Tag | Value | Payload |
+|-----|-------|---------|
+| `Custom` | 47 | `str(type_name) + uvarint(surrogate_ref)` |
+
+An escape hatch for values the core has no tag for (class instances, domain
+types, `Temporal.*`, …). The encoder consults a caller-supplied registry of
+**type extensions**; the first whose predicate matches a value claims it and
+maps it to a *surrogate* — any Graft-encodable value — stored as a heap
+reference. The decoder looks up `type_name` in its registry and reconstructs the
+value from the resolved surrogate.
+
+- `type_name`: stable identifier agreed on by both ends.
+- `surrogate_ref`: heap reference to the encoded surrogate.
+- Built-in types take precedence: an extension only applies to values not
+  already covered by tags 0–46.
+- Decoders must restore custom values lazily, after the surrogate is resolved. A
+  surrogate that references its own custom value (a cycle *through* the custom)
+  is unrepresentable and must raise an error.
+- Fallback (decoder without the named extension): a decode error — the value
+  cannot be reconstructed without the registered reconstructor.
+
 ---
 
 ## 6. Tag Summary Table
@@ -298,7 +321,8 @@ Fallback (langs without WeakSet): Set.
 | `Url`              | 44    | Extended    |
 | `DataView`         | 45    | Extended    |
 | `Error`            | 46    | Extended    |
-| 8–9, 13–19, 24–29, 32–39, 47–255 | — | **Reserved** |
+| `Custom`           | 47    | Extension   |
+| 8–9, 13–19, 24–29, 32–39, 48–255 | — | **Reserved** |
 
 Reserved tags must cause a decode error: `unknown tag: N`.
 
