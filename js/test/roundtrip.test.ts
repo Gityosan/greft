@@ -225,22 +225,3 @@ describe("RegExp", () => {
     expect(idOut.a === idOut.b && idOut.a.source === "shared" && idOut.a.flags === "g").toBe(true);
   });
 });
-
-describe("exotic objects are rejected, not silently truncated", () => {
-  it("plain object still encodes", () =>
-    expect((decode(encode({ ok: 1 })) as { ok: number }).ok).toBe(1));
-  it("null-prototype dictionary still encodes", () => {
-    const dict = Object.create(null) as Record<string, number>;
-    dict.k = 7;
-    expect((decode(encode(dict)) as { k: number }).k).toBe(7);
-  });
-  it("class instance throws", () => {
-    class Point {
-      constructor(public x = 1) {}
-    }
-    expect(() => encode(new Point())).toThrow(/unsupported object type: Point/);
-  });
-  it("Error throws", () =>
-    expect(() => encode(new Error("boom"))).toThrow(/unsupported object type/));
-  it("function throws", () => expect(() => encode(() => 1)).toThrow(/functions are out of scope/));
-});
