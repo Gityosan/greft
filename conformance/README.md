@@ -66,11 +66,17 @@ golden vectors:
 5. **Error** on unknown tags (the reserved ranges in FORMAT.md §6) rather than
    skipping them.
 
-A round-trip test (decode → re-encode → byte-compare) is **not** required and
-generally won't hold across languages: encoders may legitimately order heap
-nodes differently. Conformance is defined by *decoded value equality*, not
-byte equality. The one stable guarantee is the JS reference encoder
-reproducing its own golden bytes.
+A round-trip test (decode → re-encode → byte-compare) is **not** required for
+conformance and generally won't hold across arbitrary encoders: they may
+legitimately order heap nodes differently. Conformance is defined by *decoded
+value equality*, not byte equality.
+
+That said, the reference ports here each ship an **encoder** that deliberately
+mirrors the JS algorithm (same pre-order interning, identity/value dedup, and
+tag layout), so they *do* reproduce the golden bytes exactly. Each port asserts
+`encode(decode(bin)) == bin` for every vector as an extra, stronger self-check —
+useful for using a non-JS language to *generate* fixtures the JS reference can
+read back.
 
 ### Expected-value notation (`.meta.json`)
 
@@ -158,12 +164,12 @@ independent decoders (they do **not** reuse the JS code) and show the same
 matcher across a dynamically-typed, a statically-typed systems, and a
 garbage-collected language.
 
-| Port   | Run command                          |
-|--------|--------------------------------------|
-| js     | `cd js && pnpm conformance`          |
-| python | `python3 conformance/python/run.py`  |
-| rust   | `cd conformance/rust && cargo test`  |
-| go     | `cd conformance/go && go test ./...` |
+| Port   | Decode conformance                   | Encoder round-trip                        |
+|--------|--------------------------------------|-------------------------------------------|
+| js     | `cd js && pnpm conformance`          | (reference; verified in js tests)         |
+| python | `python3 conformance/python/run.py`  | `python3 conformance/python/roundtrip.py` |
+| rust   | `cd conformance/rust && cargo test`  | `cargo test` (same command)               |
+| go     | `cd conformance/go && go test ./...` | `go test ./...` (same command)            |
 
 Requirements for each `<lang>/`:
 

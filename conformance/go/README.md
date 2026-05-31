@@ -12,19 +12,24 @@ handles arbitrary-precision integers, so it builds and runs offline.
 
 ```bash
 cd conformance/go
-go test ./...   # one test over all vectors (used in CI)
-go run .        # prints per-vector results, exits non-zero on failure
+go test ./...   # decode conformance + encoder round-trip (used in CI)
+go run .        # prints per-vector decode results, exits non-zero on failure
 ```
+
+`go test` runs two tests: decode-vs-`.meta.json` and the encoder round-trip
+(`encode(decode(bin)) == bin`, byte-identical).
 
 ## Layout
 
 - `decode.go` — the value graph + two-pass heap decoder (FORMAT.md §4).
   Reference types (`*Array`, `*Object`, `*MapV`, `*SetV`, `*ErrorV`, `*Symbol`)
   are pointers so shared identity and cycles survive and compare by address.
+- `encode.go` — the encoder: a faithful clone of the reference algorithm
+  (pre-order interning, identity/value dedup, tag layout).
 - `match.go` — the meta matcher (binds `$ref` on first sight, asserts identity
   afterwards; matches container entries positionally, which also checks the
   property order the format mandates).
-- `run.go` — vector discovery, decode+match driver, and `main`.
+- `run.go` — vector discovery, decode+match and round-trip drivers, and `main`.
 
 ## Representation & fallbacks
 

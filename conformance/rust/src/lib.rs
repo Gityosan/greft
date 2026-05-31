@@ -5,6 +5,7 @@
 //! Zero external dependencies so it builds and runs offline.
 
 pub mod decode;
+pub mod encode;
 pub mod json;
 pub mod matcher;
 pub mod value;
@@ -67,4 +68,57 @@ fn run_one(dir: &std::path::Path, name: &str) -> Result<(), String> {
     let decoded = decode::decode(&bin)?;
     let meta = json::parse(&meta_src)?;
     matcher::match_vector(&decoded, &meta)
+}
+
+/// Re-encodes every decoded golden vector and checks the bytes are identical to
+/// the original — proving the encoder is a faithful clone of the reference.
+pub fn run_roundtrip() -> Report {
+    let dir = golden_dir();
+    let mut report = Report {
+        passed: 0,
+        failed: 0,
+        lines: Vec::new(),
+    };
+    let mut files: Vec<String> = match fs::read_dir(&dir) {
+        Ok(rd) => rd
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".bin"))
+            .collect(),
+        Err(e) => {
+            report.failed += 1;
+            report.lines.push(format!("  FAIL cannot read {}: {}", dir.display(), e));
+            return report;
+        }
+    };
+    files.sort();
+
+    for name in files {
+        match roundtrip_one(&dir, &name) {
+            Ok(len) => {
+                report.passed += 1;
+                report.lines.push(format!("  ok   {} ({} bytes)", name, len));
+            }
+            Err(e) => {
+                report.failed += 1;
+                report.lines.push(format!("  FAIL {}: {}", name, e));
+            }
+        }
+    }
+    report
+}
+
+fn roundtrip_one(dir: &std::path::Path, name: &str) -> Result<usize, String> {
+    let original = fs::read(dir.join(name)).map_err(|e| e.to_string())?;
+    let decoded = decode::decode(&original)?;
+    let reencoded = encode::encode(&decoded);
+    if reencoded == original {
+        Ok(original.len())
+    } else {
+        Err(format!(
+            "{} vs {} bytes, not identical",
+            original.len(),
+            reencoded.len()
+        ))
+    }
 }

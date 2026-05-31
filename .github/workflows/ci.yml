@@ -71,6 +71,8 @@ jobs:
           python-version: "3.11"
       - name: Run Python conformance port
         run: python3 conformance/python/run.py
+      - name: Run Python encoder round-trip
+        run: python3 conformance/python/roundtrip.py
 
   conformance-rust:
     runs-on: ubuntu-latest

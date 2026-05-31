@@ -12,15 +12,20 @@ No external crates: a minimal JSON parser for the sidecars lives in
 
 ```bash
 cd conformance/rust
-cargo test     # one test over all vectors (used in CI)
-cargo run      # prints per-vector results, exits non-zero on failure
+cargo test     # decode conformance + encoder round-trip (used in CI)
+cargo run      # prints per-vector decode results, exits non-zero on failure
 ```
+
+`cargo test` runs two suites: `tests/conformance.rs` (decode vs `.meta.json`)
+and `tests/roundtrip.rs` (`encode(decode(bin)) == bin`, byte-identical).
 
 ## Layout
 
 - `src/value.rs` — the decoded value graph. Reference types are `Rc`-wrapped so
   shared identity and cycles survive and can be compared by pointer.
 - `src/decode.rs` — the two-pass heap decoder (FORMAT.md §4).
+- `src/encode.rs` — the encoder: a faithful clone of the reference algorithm
+  (pre-order interning, identity/value dedup, tag layout).
 - `src/json.rs` — minimal JSON parser for `.meta.json`.
 - `src/matcher.rs` — the meta matcher (binds `$ref` on first sight, asserts
   identity afterwards; matches container entries positionally, which also checks

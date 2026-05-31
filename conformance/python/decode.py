@@ -31,6 +31,12 @@ class _Undefined:
 UNDEFINED = _Undefined()
 
 
+class BigInt(int):
+    """JS bigint. A subclass of int so the matcher (which checks `isinstance
+    int`) still accepts it, while encoders can tell it apart from a plain Int
+    and re-emit the BigInt tag for byte-identical round-trips."""
+
+
 @dataclass
 class Bytes:
     """JS ArrayBuffer (raw bytes)."""
@@ -192,7 +198,7 @@ def _read_node(r: Reader) -> "tuple[Any, Optional[Fill]]":
     if tag == 6:
         sign = r.u8()
         mag = r.uvarint()
-        return (-mag if sign else mag), None
+        return BigInt(-mag if sign else mag), None
     if tag == 7:
         return r.string(), None
 

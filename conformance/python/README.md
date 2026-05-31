@@ -8,17 +8,21 @@ parallel-walk algorithm in [`../README.md`](../README.md) §2.
 ## Run
 
 ```bash
-python3 conformance/python/run.py
+python3 conformance/python/run.py         # decode conformance (vs .meta.json)
+python3 conformance/python/roundtrip.py   # encoder round-trip (byte-identical)
 ```
 
-Prints one line per vector and exits non-zero if any vector fails (CI-friendly).
+Each prints one line per vector and exits non-zero on failure (CI-friendly).
 Requires Python 3.8+.
 
 ## Files
 
 - `decode.py` — the decoder. Implements the two-pass heap algorithm (FORMAT.md
   §4) so shared identity and cycles are restored, not copied.
-- `run.py` — the matcher + entry point.
+- `run.py` — the decode matcher + entry point.
+- `encode.py` — the encoder: a faithful clone of the reference algorithm (same
+  pre-order interning, identity/value dedup, tag layout).
+- `roundtrip.py` — asserts `encode(decode(bin)) == bin` for every vector.
 
 ## Representation & fallbacks
 
