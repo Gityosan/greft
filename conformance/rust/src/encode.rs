@@ -73,36 +73,23 @@ fn push_str(out: &mut Vec<u8>, s: &str) {
     out.extend_from_slice(s.as_bytes());
 }
 
-// Writes a bigint magnitude (decimal string, sign stripped) as a uvarint, by
-// repeated long-division by 128 of the decimal digits.
+// Writes a bigint (decimal string) as sign(u8) + uvarint(magnitude).
 fn push_bigint(out: &mut Vec<u8>, decimal: &str) {
-    let neg = decimal.starts_with('-');
-    let digits = if neg { &decimal[1..] } else { decimal };
-    out.push(if neg { 1 } else { 0 });
+    use num_bigint::{BigInt, BigUint, Sign};
 
-    let mut dec: Vec<u8> = digits.bytes().map(|b| b - b'0').collect();
-    let mut groups: Vec<u8> = Vec::new();
+    let n: BigInt = decimal.parse().expect("invalid bigint");
+    out.push(if n.sign() == Sign::Minus { 1 } else { 0 });
+
+    let mut mag: BigUint = n.magnitude().clone();
+    let b128 = BigUint::from(128u32);
     loop {
-        let mut rem: u32 = 0;
-        for d in dec.iter_mut() {
-            let cur = rem * 10 + *d as u32;
-            *d = (cur / 128) as u8;
-            rem = cur % 128;
-        }
-        groups.push(rem as u8);
-        while dec.len() > 1 && dec[0] == 0 {
-            dec.remove(0);
-        }
-        if dec.len() == 1 && dec[0] == 0 {
+        let byte = (&mag % &b128).iter_u64_digits().next().unwrap_or(0) as u8;
+        mag /= &b128;
+        if mag.bits() == 0 {
+            out.push(byte);
             break;
         }
-    }
-    for (i, g) in groups.iter().enumerate() {
-        if i + 1 < groups.len() {
-            out.push(g | 0x80);
-        } else {
-            out.push(*g);
-        }
+        out.push(byte | 0x80);
     }
 }
 
@@ -203,7 +190,10 @@ impl Encoder {
                 });
                 push_str(&mut out, &sym.value);
             }
-            Value::Date { unix_ms, sub_ms_nanos } => {
+            Value::Date {
+                unix_ms,
+                sub_ms_nanos,
+            } => {
                 out.push(40);
                 push_svarint(&mut out, *unix_ms);
                 push_svarint(&mut out, *sub_ms_nanos);
@@ -249,8 +239,10 @@ impl Encoder {
             }
             Value::Map(rc) => {
                 let pairs = rc.borrow().clone();
-                let refs: Vec<(usize, usize)> =
-                    pairs.iter().map(|(k, val)| (self.intern(k), self.intern(val))).collect();
+                let refs: Vec<(usize, usize)> = pairs
+                    .iter()
+                    .map(|(k, val)| (self.intern(k), self.intern(val)))
+                    .collect();
                 out.push(22);
                 push_uvarint(&mut out, refs.len() as u64);
                 for (kr, vr) in refs {

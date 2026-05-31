@@ -6,7 +6,6 @@
 
 pub mod decode;
 pub mod encode;
-pub mod json;
 pub mod matcher;
 pub mod value;
 
@@ -40,7 +39,9 @@ pub fn run_all() -> Report {
             .collect(),
         Err(e) => {
             report.failed += 1;
-            report.lines.push(format!("  FAIL cannot read {}: {}", dir.display(), e));
+            report
+                .lines
+                .push(format!("  FAIL cannot read {}: {}", dir.display(), e));
             return report;
         }
     };
@@ -66,7 +67,7 @@ fn run_one(dir: &std::path::Path, name: &str) -> Result<(), String> {
     let meta_name = format!("{}.meta.json", &name[..name.len() - 4]);
     let meta_src = fs::read_to_string(dir.join(&meta_name)).map_err(|e| e.to_string())?;
     let decoded = decode::decode(&bin)?;
-    let meta = json::parse(&meta_src)?;
+    let meta: serde_json::Value = serde_json::from_str(&meta_src).map_err(|e| e.to_string())?;
     matcher::match_vector(&decoded, &meta)
 }
 
@@ -87,7 +88,9 @@ pub fn run_roundtrip() -> Report {
             .collect(),
         Err(e) => {
             report.failed += 1;
-            report.lines.push(format!("  FAIL cannot read {}: {}", dir.display(), e));
+            report
+                .lines
+                .push(format!("  FAIL cannot read {}: {}", dir.display(), e));
             return report;
         }
     };
@@ -97,7 +100,9 @@ pub fn run_roundtrip() -> Report {
         match roundtrip_one(&dir, &name) {
             Ok(len) => {
                 report.passed += 1;
-                report.lines.push(format!("  ok   {} ({} bytes)", name, len));
+                report
+                    .lines
+                    .push(format!("  ok   {} ({} bytes)", name, len));
             }
             Err(e) => {
                 report.failed += 1;

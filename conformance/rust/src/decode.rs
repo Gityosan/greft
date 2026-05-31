@@ -78,30 +78,19 @@ impl<'a> Reader<'a> {
 }
 
 fn groups_to_decimal(sign: u8, groups: &[u8]) -> String {
-    let mut acc: Vec<u8> = Vec::new(); // base-10 digits, little-endian
+    // value = sum(groups[i] * 128^i); groups are little-endian 7-bit payloads.
+    use num_bigint::BigUint;
+    let b128 = BigUint::from(128u32);
+    let mut n = BigUint::from(0u32);
     for &g in groups.iter().rev() {
-        let mut carry = g as u32; // acc = acc * 128 + g
-        for d in acc.iter_mut() {
-            let t = (*d as u32) * 128 + carry;
-            *d = (t % 10) as u8;
-            carry = t / 10;
-        }
-        while carry > 0 {
-            acc.push((carry % 10) as u8);
-            carry /= 10;
-        }
+        n = n * &b128 + BigUint::from(g);
     }
-    if acc.is_empty() {
-        return "0".to_string();
+    let s = n.to_str_radix(10);
+    if sign == 1 && s != "0" {
+        format!("-{}", s)
+    } else {
+        s
     }
-    let mut s = String::new();
-    if sign == 1 {
-        s.push('-');
-    }
-    for &d in acc.iter().rev() {
-        s.push((b'0' + d) as char);
-    }
-    s
 }
 
 fn element_type_name(code: u8) -> Result<&'static str, String> {

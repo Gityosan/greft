@@ -4,8 +4,8 @@
 //! must be genuinely restored. Container entries are matched positionally, which
 //! also verifies the property order the format mandates.
 
-use crate::json::Json;
-use crate::value::{ref_id, hex, Key, Value};
+use crate::value::{hex, ref_id, Key, Value};
+use serde_json::Value as Json;
 use std::collections::{HashMap, HashSet};
 
 pub fn match_vector(decoded: &Value, meta: &Json) -> Result<(), String> {
@@ -48,7 +48,11 @@ impl<'a> Matcher<'a> {
             match ref_id(actual) {
                 Some(ptr) => {
                     if let Some(&prev) = self.bound.get(&idx) {
-                        return req(prev == ptr, path, &format!("identity mismatch for $ref {}", idx));
+                        return req(
+                            prev == ptr,
+                            path,
+                            &format!("identity mismatch for $ref {}", idx),
+                        );
                     }
                     self.bound.insert(idx, ptr);
                     self.claimed.insert(ptr);
@@ -64,25 +68,48 @@ impl<'a> Matcher<'a> {
     }
 
     fn match_inline(&mut self, mv: &Json, actual: &Value, path: &str) -> Result<(), String> {
-        let tag = mv.get("$").and_then(Json::as_str).ok_or("missing inline $")?;
+        let tag = mv
+            .get("$")
+            .and_then(Json::as_str)
+            .ok_or("missing inline $")?;
         match tag {
             "null" => req(matches!(actual, Value::Null), path, "expected null"),
-            "undefined" => req(matches!(actual, Value::Undefined), path, "expected undefined"),
+            "undefined" => req(
+                matches!(actual, Value::Undefined),
+                path,
+                "expected undefined",
+            ),
             "bool" => {
                 let v = mv.get("v").and_then(Json::as_bool).ok_or("bad bool")?;
-                req(matches!(actual, Value::Bool(b) if *b == v), path, "bool mismatch")
+                req(
+                    matches!(actual, Value::Bool(b) if *b == v),
+                    path,
+                    "bool mismatch",
+                )
             }
             "int" => {
                 let v = mv.get("v").and_then(Json::as_i64).ok_or("bad int")?;
-                req(matches!(actual, Value::Int(i) if *i == v), path, "int mismatch")
+                req(
+                    matches!(actual, Value::Int(i) if *i == v),
+                    path,
+                    "int mismatch",
+                )
             }
             "bigint" => {
                 let v = mv.get("v").and_then(Json::as_str).ok_or("bad bigint")?;
-                req(matches!(actual, Value::BigInt(s) if s == v), path, "bigint mismatch")
+                req(
+                    matches!(actual, Value::BigInt(s) if s == v),
+                    path,
+                    "bigint mismatch",
+                )
             }
             "string" => {
                 let v = mv.get("v").and_then(Json::as_str).ok_or("bad string")?;
-                req(matches!(actual, Value::Str(s) if s == v), path, "string mismatch")
+                req(
+                    matches!(actual, Value::Str(s) if s == v),
+                    path,
+                    "string mismatch",
+                )
             }
             "float" => self.match_float(mv.get("v").ok_or("bad float")?, actual, path),
             other => Err(format!("{}: unknown inline tag {}", path, other)),
@@ -108,11 +135,17 @@ impl<'a> Matcher<'a> {
     }
 
     fn match_node(&mut self, node: &Json, actual: &Value, path: &str) -> Result<(), String> {
-        let tag = node.get("tag").and_then(Json::as_str).ok_or("node missing tag")?;
+        let tag = node
+            .get("tag")
+            .and_then(Json::as_str)
+            .ok_or("node missing tag")?;
         match tag {
             "Object" => self.match_object(node, actual, path),
             "Array" => {
-                let items = node.get("items").and_then(Json::as_array).ok_or("bad items")?;
+                let items = node
+                    .get("items")
+                    .and_then(Json::as_array)
+                    .ok_or("bad items")?;
                 if let Value::Array(rc) = actual {
                     let arr = rc.borrow();
                     req(arr.len() == items.len(), path, "array length mismatch")?;
@@ -125,13 +158,24 @@ impl<'a> Matcher<'a> {
                 }
             }
             "Map" => {
-                let entries = node.get("entries").and_then(Json::as_array).ok_or("bad entries")?;
+                let entries = node
+                    .get("entries")
+                    .and_then(Json::as_array)
+                    .ok_or("bad entries")?;
                 if let Value::Map(rc) = actual {
                     let pairs = rc.borrow();
                     req(pairs.len() == entries.len(), path, "map size mismatch")?;
                     for (i, e) in entries.iter().enumerate() {
-                        self.match_value(e.get("key").ok_or("key")?, &pairs[i].0, &format!("{}{{k{}}}", path, i))?;
-                        self.match_value(e.get("value").ok_or("value")?, &pairs[i].1, &format!("{}{{v{}}}", path, i))?;
+                        self.match_value(
+                            e.get("key").ok_or("key")?,
+                            &pairs[i].0,
+                            &format!("{}{{k{}}}", path, i),
+                        )?;
+                        self.match_value(
+                            e.get("value").ok_or("value")?,
+                            &pairs[i].1,
+                            &format!("{}{{v{}}}", path, i),
+                        )?;
                     }
                     Ok(())
                 } else {
@@ -139,7 +183,10 @@ impl<'a> Matcher<'a> {
                 }
             }
             "Set" => {
-                let values = node.get("values").and_then(Json::as_array).ok_or("bad values")?;
+                let values = node
+                    .get("values")
+                    .and_then(Json::as_array)
+                    .ok_or("bad values")?;
                 if let Value::Set(rc) = actual {
                     let vals = rc.borrow();
                     req(vals.len() == values.len(), path, "set size mismatch")?;
@@ -152,19 +199,37 @@ impl<'a> Matcher<'a> {
                 }
             }
             "Date" => {
-                let ms = node.get("unix_ms").and_then(Json::as_i64).ok_or("bad unix_ms")?;
-                req(matches!(actual, Value::Date { unix_ms, .. } if *unix_ms == ms), path, "Date mismatch")
+                let ms = node
+                    .get("unix_ms")
+                    .and_then(Json::as_i64)
+                    .ok_or("bad unix_ms")?;
+                req(
+                    matches!(actual, Value::Date { unix_ms, .. } if *unix_ms == ms),
+                    path,
+                    "Date mismatch",
+                )
             }
             "Bytes" => {
                 let h = node.get("hex").and_then(Json::as_str).unwrap_or("");
-                req(matches!(actual, Value::Bytes(b) if hex(b) == h), path, "Bytes mismatch")
+                req(
+                    matches!(actual, Value::Bytes(b) if hex(b) == h),
+                    path,
+                    "Bytes mismatch",
+                )
             }
             "DataView" => {
                 let h = node.get("hex").and_then(Json::as_str).unwrap_or("");
-                req(matches!(actual, Value::DataView(b) if hex(b) == h), path, "DataView mismatch")
+                req(
+                    matches!(actual, Value::DataView(b) if hex(b) == h),
+                    path,
+                    "DataView mismatch",
+                )
             }
             "TypedArray" => {
-                let et = node.get("element_type").and_then(Json::as_str).unwrap_or("");
+                let et = node
+                    .get("element_type")
+                    .and_then(Json::as_str)
+                    .unwrap_or("");
                 let h = node.get("hex").and_then(Json::as_str).unwrap_or("");
                 req(
                     matches!(actual, Value::TypedArray { element_type, data } if element_type == et && hex(data) == h),
@@ -183,7 +248,11 @@ impl<'a> Matcher<'a> {
             }
             "Url" => {
                 let href = node.get("href").and_then(Json::as_str).unwrap_or("");
-                req(matches!(actual, Value::Url(h) if h == href), path, "Url mismatch")
+                req(
+                    matches!(actual, Value::Url(h) if h == href),
+                    path,
+                    "Url mismatch",
+                )
             }
             "Error" => self.match_error(node, actual, path),
             "SymbolRegistered" => self.match_symbol(actual, "registered", node.get("key"), path),
@@ -193,7 +262,13 @@ impl<'a> Matcher<'a> {
         }
     }
 
-    fn match_symbol(&self, actual: &Value, kind: &str, val: Option<&Json>, path: &str) -> Result<(), String> {
+    fn match_symbol(
+        &self,
+        actual: &Value,
+        kind: &str,
+        val: Option<&Json>,
+        path: &str,
+    ) -> Result<(), String> {
         let expected = val.and_then(Json::as_str).ok_or("bad symbol value")?;
         req(
             matches!(actual, Value::Symbol(s) if s.kind == kind && s.value == expected),
@@ -203,13 +278,20 @@ impl<'a> Matcher<'a> {
     }
 
     fn match_object(&mut self, node: &Json, actual: &Value, path: &str) -> Result<(), String> {
-        let entries = node.get("entries").and_then(Json::as_array).ok_or("bad entries")?;
+        let entries = node
+            .get("entries")
+            .and_then(Json::as_array)
+            .ok_or("bad entries")?;
         let rc = match actual {
             Value::Object(rc) => rc,
             _ => return Err(format!("{}: expected object", path)),
         };
         let decoded = rc.borrow();
-        req(decoded.len() == entries.len(), path, "object entry count mismatch")?;
+        req(
+            decoded.len() == entries.len(),
+            path,
+            "object entry count mismatch",
+        )?;
         for (i, e) in entries.iter().enumerate() {
             self.match_entry(e, &decoded[i], path)?;
         }
@@ -222,19 +304,41 @@ impl<'a> Matcher<'a> {
             _ => return Err(format!("{}: expected Error", path)),
         };
         let err = rc.borrow();
-        req(Some(err.name.as_str()) == node.get("name").and_then(Json::as_str), path, "error name mismatch")?;
-        req(Some(err.message.as_str()) == node.get("message").and_then(Json::as_str), path, "error message mismatch")?;
+        req(
+            Some(err.name.as_str()) == node.get("name").and_then(Json::as_str),
+            path,
+            "error name mismatch",
+        )?;
+        req(
+            Some(err.message.as_str()) == node.get("message").and_then(Json::as_str),
+            path,
+            "error message mismatch",
+        )?;
 
-        let has_cause = node.get("hasCause").and_then(Json::as_bool).unwrap_or(false);
+        let has_cause = node
+            .get("hasCause")
+            .and_then(Json::as_bool)
+            .unwrap_or(false);
         if has_cause {
             req(err.has_cause, path, "expected cause")?;
-            self.match_value(node.get("cause").ok_or("cause")?, &err.cause, &format!("{}.cause", path))?;
+            self.match_value(
+                node.get("cause").ok_or("cause")?,
+                &err.cause,
+                &format!("{}.cause", path),
+            )?;
         } else {
             req(!err.has_cause, path, "unexpected cause")?;
         }
 
-        let extra = node.get("extra").and_then(Json::as_array).ok_or("bad extra")?;
-        req(err.extra.len() == extra.len(), path, "error extra count mismatch")?;
+        let extra = node
+            .get("extra")
+            .and_then(Json::as_array)
+            .ok_or("bad extra")?;
+        req(
+            err.extra.len() == extra.len(),
+            path,
+            "error extra count mismatch",
+        )?;
         for (i, e) in extra.iter().enumerate() {
             self.match_entry(e, &err.extra[i], path)?;
         }
@@ -243,21 +347,42 @@ impl<'a> Matcher<'a> {
 
     /// Matches one Object/Error property entry against a decoded `(Key, Value)`.
     fn match_entry(&mut self, e: &Json, decoded: &(Key, Value), path: &str) -> Result<(), String> {
-        let kind = e.get("keyKind").and_then(Json::as_str).ok_or("bad keyKind")?;
+        let kind = e
+            .get("keyKind")
+            .and_then(Json::as_str)
+            .ok_or("bad keyKind")?;
         let (key, val) = decoded;
         match kind {
             "string" => {
                 let expected = e.get("key").and_then(Json::as_str).ok_or("bad key")?;
                 match key {
-                    Key::Str(s) => req(s == expected, path, &format!("string key {} != {}", s, expected))?,
-                    Key::Sym(_) => return Err(format!("{}: expected string key {}", path, expected)),
+                    Key::Str(s) => req(
+                        s == expected,
+                        path,
+                        &format!("string key {} != {}", s, expected),
+                    )?,
+                    Key::Sym(_) => {
+                        return Err(format!("{}: expected string key {}", path, expected))
+                    }
                 }
-                self.match_value(e.get("value").ok_or("value")?, val, &format!("{}.{}", path, expected))
+                self.match_value(
+                    e.get("value").ok_or("value")?,
+                    val,
+                    &format!("{}.{}", path, expected),
+                )
             }
             "symbol" => match key {
                 Key::Sym(symval) => {
-                    self.match_value(e.get("key").ok_or("key")?, symval, &format!("{}[symkey]", path))?;
-                    self.match_value(e.get("value").ok_or("value")?, val, &format!("{}[symval]", path))
+                    self.match_value(
+                        e.get("key").ok_or("key")?,
+                        symval,
+                        &format!("{}[symkey]", path),
+                    )?;
+                    self.match_value(
+                        e.get("value").ok_or("value")?,
+                        val,
+                        &format!("{}[symval]", path),
+                    )
                 }
                 Key::Str(s) => Err(format!("{}: expected symbol key, got {}", path, s)),
             },

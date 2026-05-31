@@ -7,5 +7,9 @@ fn all_golden_vectors_pass() {
     for line in &report.lines {
         println!("{}", line);
     }
-    assert_eq!(report.failed, 0, "{} conformance vector(s) failed", report.failed);
+    assert_eq!(
+        report.failed, 0,
+        "{} conformance vector(s) failed",
+        report.failed
+    );
 }

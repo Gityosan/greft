@@ -149,7 +149,7 @@ conformance/
   README.md            ← this file
   js/                  ← reference port (run.ts: decode + match against meta)
   python/              ← stdlib-only decoder + runner (run.py)
-  rust/                ← zero-dependency decoder + runner (cargo test)
+  rust/                ← decoder + runner (cargo test; serde_json + num-bigint)
   go/                  ← stdlib-only decoder + runner (go test)
   <lang>/              ← future ports e.g. ruby/, cpp/
     README.md          ← how to build & run this port's conformance suite
