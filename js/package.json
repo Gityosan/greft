@@ -1,10 +1,30 @@
 {
   "name": "greft",
-  "version": "1.0.0",
-  "description": "",
-  "keywords": [],
+  "version": "0.1.0",
+  "description": "Language-agnostic lossless binary serializer — encode in JS, decode in Python / Rust / Go / …. Zero runtime dependencies.",
+  "keywords": [
+    "serialization",
+    "deserialization",
+    "binary",
+    "codec",
+    "lossless",
+    "cross-language",
+    "leb128",
+    "zigzag",
+    "structured-clone",
+    "fixture"
+  ],
   "license": "ISC",
-  "author": "",
+  "author": "Gityosan (https://github.com/Gityosan)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gityosan/greft.git",
+    "directory": "js"
+  },
+  "bugs": {
+    "url": "https://github.com/Gityosan/greft/issues"
+  },
+  "homepage": "https://github.com/Gityosan/greft#readme",
   "bin": {
     "graft": "./dist/cli.js"
   },
