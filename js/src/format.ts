@@ -37,6 +37,9 @@ export enum Tag {
   Bytes = 41, // uvarint(byte_length) + raw_bytes (ArrayBuffer)
   TypedArray = 42, // u8(element_type) + uvarint(byte_length) + raw_bytes (LE)
   RegExp = 43, // str(source) + str(flags)
+  Url = 44, // str(href)
+  DataView = 45, // uvarint(byte_length) + raw_bytes (viewed window)
+  Error = 46, // str(name) + str(message) + u8(flags) [+ cause_ref] + extra entries
 }
 
 // TypedArray element type codes (see FORMAT.md §5.4).

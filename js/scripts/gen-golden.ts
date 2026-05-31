@@ -98,6 +98,7 @@ function toMeta(root: unknown): { root: unknown; nodes: unknown[] } {
     }
     if (v instanceof Date) return { tag: "Date", unix_ms: v.getTime(), sub_ms_nanos: 0 };
     if (v instanceof RegExp) return { tag: "RegExp", source: v.source, flags: v.flags };
+    if (typeof URL !== "undefined" && v instanceof URL) return { tag: "Url", href: v.href };
     for (const [Ctor, name] of elementTypeName) {
       if (v instanceof Ctor) {
         const view = v as ArrayBufferView;
@@ -105,7 +106,34 @@ function toMeta(root: unknown): { root: unknown; nodes: unknown[] } {
         return { tag: "TypedArray", element_type: name, hex: toHex(bytes) };
       }
     }
+    if (v instanceof DataView)
+      return { tag: "DataView", hex: toHex(new Uint8Array(v.buffer, v.byteOffset, v.byteLength)) };
     if (v instanceof ArrayBuffer) return { tag: "Bytes", hex: toHex(new Uint8Array(v)) };
+    if (v instanceof Error) {
+      const hasCause = Object.prototype.hasOwnProperty.call(v, "cause");
+      const skip = new Set(["name", "message", "stack", "cause"]);
+      const extra: unknown[] = [];
+      for (const k of Object.keys(v)) {
+        if (skip.has(k)) continue;
+        extra.push({ keyKind: "string", key: k, value: ref((v as Record<string, unknown>)[k]) });
+      }
+      for (const s of Object.getOwnPropertySymbols(v)) {
+        if (!Object.getOwnPropertyDescriptor(v, s)?.enumerable) continue;
+        extra.push({
+          keyKind: "symbol",
+          key: ref(s),
+          value: ref((v as Record<symbol, unknown>)[s]),
+        });
+      }
+      return {
+        tag: "Error",
+        name: v.name,
+        message: v.message,
+        hasCause,
+        ...(hasCause ? { cause: ref((v as { cause?: unknown }).cause) } : {}),
+        extra,
+      };
+    }
     if (Array.isArray(v)) return { tag: "Array", items: v.map((x) => ref(x)) };
     if (v instanceof Map)
       return {
@@ -203,6 +231,36 @@ emit("regexp.bin", {
   unicode: /\p{Letter}+/u,
   special: /[/\\]"'\n\t/,
 });
+
+// --- URL (FORMAT.md §5.1, Tag 44) ---
+emit("url.bin", {
+  full: new URL("https://user:pw@example.com:8443/a/b?q=1&r=2#frag"),
+  simple: new URL("http://x.test/"),
+});
+
+// --- DataView (FORMAT.md §5.1, Tag 45) ---
+{
+  const buf = new ArrayBuffer(8);
+  const view = new DataView(buf, 2, 4);
+  view.setUint32(0, 0xdeadbeef);
+  emit("dataview.bin", { view, empty: new DataView(new ArrayBuffer(0)) });
+}
+
+// --- Error, incl. subclass / cause / extra props (FORMAT.md §5.7) ---
+{
+  const withCause = new Error("outer", { cause: { code: 42 } });
+  const withExtra = new Error("annotated") as Error & { detail?: string };
+  withExtra.detail = "context";
+  const renamed = new Error("weird");
+  renamed.name = "CustomError";
+  emit("error.bin", {
+    basic: new Error("boom"),
+    typed: new TypeError("not a function"),
+    with_cause: withCause,
+    with_extra: withExtra,
+    renamed,
+  });
+}
 
 // --- Map / Set, including object keys (FORMAT.md §5.5) ---
 {

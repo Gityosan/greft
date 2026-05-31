@@ -116,6 +116,8 @@ Decoder algorithm (required for all implementations):
 | `String`           | 7  | `str`                           | UTF-8. |
 | `Bytes`            | 41 | `uvarint(len) + raw`            | Raw ArrayBuffer / byte string. No element type. Fallback: `[]byte` / `Vec<u8>` / `bytes`. |
 | `RegExp`           | 43 | `str(source) + str(flags)`      | JS `RegExp`. `source` is the pattern text, `flags` the flag string (e.g. `"gi"`). Fallback: object `{source, flags}` or a language-native regex if available. |
+| `Url`              | 44 | `str(href)`                     | JS `URL`. Serialized absolute URL string. Fallback: plain string. |
+| `DataView`         | 45 | `uvarint(len) + raw`            | JS `DataView` over its viewed window (`byteOffset … byteOffset+byteLength`). Distinct tag from `Bytes` so the view type survives. Fallback: `Bytes`. |
 
 ### 5.2 Symbol Nodes
 
@@ -242,6 +244,30 @@ Fallback (langs without WeakMap): Map.
 
 Fallback (langs without WeakSet): Set.
 
+### 5.7 Error Node (children: cause + extra properties)
+
+| Tag | Value | Payload |
+|-----|-------|---------|
+| `Error` | 46 | `str(name) + str(message) + u8(flags) [+ uvarint(cause_ref)] + uvarint(extra_count) + entry{extra_count}` |
+
+- `name`: the error's `name` (e.g. `"Error"`, `"TypeError"`). Decoders restore
+  the matching built-in constructor when `name` is one of `Error`, `EvalError`,
+  `RangeError`, `ReferenceError`, `SyntaxError`, `TypeError`, `URIError`;
+  otherwise a base `Error` whose `name` property is set to the stored value.
+- `message`: the error's `message` string.
+- `flags`: `bit0 = hasCause`. When set, `cause_ref` (a heap reference to an
+  arbitrary value) immediately follows. `cause` is restored as a
+  non-enumerable property, matching the ECMAScript `{ cause }` option.
+- `extra_count` + `entry{}`: any **own enumerable** properties (string- or
+  symbol-keyed), encoded exactly like `Object` entries (§5.5). The intrinsic
+  `name` / `message` / `stack` / `cause` slots are non-enumerable and never
+  appear here, so there is no double-encoding.
+- `stack` is **not** encoded — it is environment-derived, not portable data.
+  Decoders synthesize a fresh stack. This is the one documented exception to the
+  encoder's losslessness for `Error`.
+- Fallback (langs without a native error type): object
+  `{ name, message, cause?, ...extra }`.
+
 ---
 
 ## 6. Tag Summary Table
@@ -269,7 +295,10 @@ Fallback (langs without WeakSet): Set.
 | `Bytes`            | 41    | Extended    |
 | `TypedArray`       | 42    | Extended    |
 | `RegExp`           | 43    | Extended    |
-| 8–9, 13–19, 24–29, 32–39, 44–255 | — | **Reserved** |
+| `Url`              | 44    | Extended    |
+| `DataView`         | 45    | Extended    |
+| `Error`            | 46    | Extended    |
+| 8–9, 13–19, 24–29, 32–39, 47–255 | — | **Reserved** |
 
 Reserved tags must cause a decode error: `unknown tag: N`.
 
@@ -337,7 +366,23 @@ Int8Array → Uint8ClampedArray → Uint8Array →
 ArrayBuffer → ...
 ```
 
-`DataView` is intentionally excluded from TypedArray encoding.
+`DataView` has its own tag (§5.1, `DataView` = 45) and is **not** encoded as a
+TypedArray; the TypedArray path is for the eleven typed-array views only.
+
+### Boxed primitives (JS)
+
+`new Number(x)` / `new String(x)` / `new Boolean(x)` are unwrapped to their
+primitive value and encoded as `Int` / `Float` / `String` / `BoolTrue|False`.
+This is **best-effort**: wrapper-object identity and any extra own properties on
+the wrapper are dropped. Genuine primitives are unaffected.
+
+### Arrays with non-index properties (JS)
+
+`Array` encodes elements `0 … length-1` only. An array carrying additional own
+**enumerable** properties (e.g. `arr.foo = 1`, or an enumerable symbol key)
+cannot be represented without loss, so the encoder rejects it rather than
+silently dropping those properties. Convert to a plain object first if you need
+them preserved.
 
 ### Exotic objects without a tag (JS)
 
@@ -345,8 +390,9 @@ The encoder must not silently truncate objects it has no tag for. After the
 typed checks above, an object is encoded as a plain `Object` node **only** if
 its prototype is `Object.prototype` or `null` (i.e. a plain record or a
 null-prototype dictionary). Any other object whose internal state is not
-captured by its own enumerable properties — e.g. class instances, `Error`,
-`URL`, `Promise`, `DataView` — must raise an error rather than be written as an
-empty/partial `Object`. This keeps the "encoder → file is lossless" guarantee
-honest and is consistent with `function`, which is also rejected. Callers that
-want to serialize such a value should convert it to a supported shape first.
+captured by a dedicated tag or its own enumerable properties — e.g. class
+instances, `Promise`, `WeakRef`, `Map`/`Set` subclasses with extra state —
+must raise an error rather than be written as an empty/partial `Object`. This
+keeps the "encoder → file is lossless" guarantee honest and is consistent with
+`function`, which is also rejected. Callers that want to serialize such a value
+should convert it to a supported shape first.

@@ -180,6 +180,19 @@ function matchVector(decoded: unknown, meta: Meta): void {
           path,
           `expected /${String(node.source)}/${String(node.flags)}`,
         );
+      case "Url":
+        return check(
+          typeof URL !== "undefined" && actual instanceof URL && actual.href === node.href,
+          path,
+          `expected URL ${JSON.stringify(node.href)}`,
+        );
+      case "DataView": {
+        if (!(actual instanceof DataView)) return fail(path, "expected DataView");
+        const bytes = new Uint8Array(actual.buffer, actual.byteOffset, actual.byteLength);
+        return check(hex(bytes) === node.hex, path, "DataView bytes mismatch");
+      }
+      case "Error":
+        return matchError(node, actual, path);
       case "SymbolRegistered":
         return check(
           typeof actual === "symbol" && Symbol.keyFor(actual) === node.key,
@@ -241,6 +254,57 @@ function matchVector(decoded: unknown, meta: Meta): void {
       const target = resolveSymbolKey(keyRef, ownSyms, path);
       matchValue(keyRef, target, `${path}[symbol key]`); // binds / validates the symbol node
       matchValue(e.value, obj[target], `${path}[${String(target)}]`);
+    }
+  }
+
+  function matchError(node: MetaNode, actual: unknown, path: string): void {
+    check(actual instanceof Error, path, "expected Error");
+    const err = actual as Error & { cause?: unknown };
+    check(err.name === node.name, path, `error name ${err.name} != ${String(node.name)}`);
+    check(err.message === node.message, path, `error message mismatch`);
+
+    if (node.hasCause) {
+      check(Object.prototype.hasOwnProperty.call(err, "cause"), path, "expected own cause");
+      matchValue(node.cause as MetaValue, err.cause, `${path}.cause`);
+    } else {
+      check(!Object.prototype.hasOwnProperty.call(err, "cause"), path, "unexpected cause");
+    }
+
+    // Extra own enumerable props (intrinsic name/message/stack/cause excluded).
+    const skip = new Set(["name", "message", "stack", "cause"]);
+    const extra = node.extra as Array<{
+      keyKind: "string" | "symbol";
+      key: string | MetaValue;
+      value: MetaValue;
+    }>;
+    const stringExtra = extra.filter((e) => e.keyKind === "string");
+    const symbolExtra = extra.filter((e) => e.keyKind === "symbol");
+
+    const ownStr = Object.keys(err).filter((k) => !skip.has(k));
+    check(
+      ownStr.length === stringExtra.length,
+      path,
+      `error extra string count ${ownStr.length} != ${stringExtra.length}`,
+    );
+    for (const e of stringExtra) {
+      const key = e.key as string;
+      check(Object.prototype.hasOwnProperty.call(err, key), path, `missing extra ${key}`);
+      matchValue(e.value, (err as unknown as Record<string, unknown>)[key], `${path}.${key}`);
+    }
+
+    const ownSyms = Object.getOwnPropertySymbols(err).filter(
+      (s) => Object.getOwnPropertyDescriptor(err, s)?.enumerable,
+    );
+    check(ownSyms.length === symbolExtra.length, path, `error extra symbol count`);
+    for (const e of symbolExtra) {
+      const keyRef = e.key as MetaRef;
+      const target = resolveSymbolKey(keyRef, ownSyms, path);
+      matchValue(keyRef, target, `${path}[symbol key]`);
+      matchValue(
+        e.value,
+        (err as unknown as Record<symbol, unknown>)[target],
+        `${path}[${String(target)}]`,
+      );
     }
   }
 

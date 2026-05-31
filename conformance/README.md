@@ -28,6 +28,9 @@ cases. Decode the whole file once, then assert on each key.
 | `bytes.bin`      | §5.1 `Bytes`         | ArrayBuffer (non-empty + empty) |
 | `typedarray.bin` | §5.4                 | every `ElementType` (0–10) + an empty array |
 | `regexp.bin`     | §5.1 `RegExp`        | plain, flags, empty (normalized), unicode, escaped specials |
+| `url.bin`        | §5.1 `Url`           | full URL (auth, port, query, fragment) + simple |
+| `dataview.bin`   | §5.1 `DataView`      | non-empty viewed window + empty |
+| `error.bin`      | §5.7                 | base, builtin subclass, with cause, with extra prop, renamed |
 | `map_set.bin`    | §5.5                 | Map & Set, including an object-identity key shared between them |
 | `symbol.bin`     | §5.2                 | Registered, Unique (with file-internal identity), WellKnown |
 | `cycles.bin`     | §4                   | self-cycle, cross-references, shared identity |
@@ -109,10 +112,19 @@ A `<node>` (every entry in `nodes`) is a reference-typed value, tagged:
 { "tag": "Bytes", "hex": "01020304" }
 { "tag": "TypedArray", "element_type": "Uint8", "hex": "00 7f ff joined without spaces" }
 { "tag": "RegExp", "source": "ab+c", "flags": "gi" }
+{ "tag": "Url", "href": "https://example.com/" }
+{ "tag": "DataView", "hex": "deadbeef" }
+{ "tag": "Error", "name": "TypeError", "message": "…",
+    "hasCause": true, "cause": <value>,    // present only when hasCause
+    "extra": [ { "keyKind": "string", "key": "code", "value": <value> } ] }
 { "tag": "SymbolRegistered", "key": "app.id" }
 { "tag": "SymbolUnique",     "description": "desc" }
 { "tag": "SymbolWellKnown",  "name": "iterator" }
 ```
+
+For `Error`, `extra` holds only own **enumerable** properties; the intrinsic
+`name` / `message` / `stack` / `cause` slots are excluded (and `stack` is never
+encoded). `cause` is restored as a non-enumerable property.
 
 Two `<value>`s carrying the same `$ref` index **must** decode to the same object
 (identity); a node that transitively references its own index encodes a cycle.

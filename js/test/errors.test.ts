@@ -26,26 +26,36 @@ describe("encoder rejects values it cannot represent losslessly", () => {
   it("function as nested value throws", () =>
     expect(() => encode({ fn: () => 1 })).toThrow(/functions are out of scope/));
 
-  it("class instance throws with its constructor name", () => {
+  it("plain class instance throws with its constructor name", () => {
     class Point {
       constructor(public x = 1) {}
     }
     expect(() => encode(new Point())).toThrow(/unsupported object type: Point/);
   });
 
-  it("Error throws", () =>
-    expect(() => encode(new Error("boom"))).toThrow(/unsupported object type: Error/));
-  it("URL throws", () =>
-    expect(() => encode(new URL("https://example.com"))).toThrow(/unsupported object type: URL/));
   it("Promise throws", () =>
     expect(() => encode(Promise.resolve(1))).toThrow(/unsupported object type: Promise/));
-  it("DataView throws (excluded from TypedArray encoding)", () =>
-    expect(() => encode(new DataView(new ArrayBuffer(8)))).toThrow(
-      /unsupported object type: DataView/,
-    ));
+  it("WeakRef throws", () =>
+    expect(() => encode(new WeakRef({}))).toThrow(/unsupported object type: WeakRef/));
 
-  it("exotic value nested inside a supported container still throws", () =>
-    expect(() => encode([new Error("x")])).toThrow(/unsupported object type: Error/));
+  it("non-representable value nested in a container still throws", () =>
+    expect(() => encode([Promise.resolve(1)])).toThrow(/unsupported object type: Promise/));
+
+  it("array with extra (non-index) string property throws", () => {
+    const arr: number[] & { foo?: string } = [1, 2];
+    arr.foo = "lost?";
+    expect(() => encode(arr)).toThrow(/array with non-index properties is not supported: foo/);
+  });
+  it("array with enumerable symbol property throws", () => {
+    const arr: unknown[] = [1];
+    Object.defineProperty(arr, Symbol("tag"), { value: 1, enumerable: true });
+    expect(() => encode(arr)).toThrow(/array with non-index properties is not supported/);
+  });
+  it("sparse array (holes only, no extra props) does NOT throw", () => {
+    const arr = [1, , 3]; // eslint-disable-line no-sparse-arrays
+    const out = decode(encode(arr)) as unknown[];
+    expect(out.length === 3 && out[0] === 1 && out[1] === undefined && out[2] === 3).toBe(true);
+  });
 });
 
 describe("decoder rejects malformed or unknown streams", () => {

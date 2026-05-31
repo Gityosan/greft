@@ -14,6 +14,36 @@ const wellKnownByName = new Map<string, symbol>(
     .map((n) => [String(n), (Symbol as any)[n] as symbol]),
 );
 
+// Built-in Error constructors restorable by name; unknown names become a base
+// Error with `.name` set to the stored value.
+const errorCtors: Record<string, new (message?: string) => Error> = {
+  Error,
+  EvalError,
+  RangeError,
+  ReferenceError,
+  SyntaxError,
+  TypeError,
+  URIError,
+};
+function makeError(name: string, message: string): Error {
+  const Ctor = errorCtors[name];
+  if (Ctor) return new Ctor(message);
+  const e = new Error(message);
+  e.name = name;
+  return e;
+}
+
+// Assign an own enumerable data property. Uses defineProperty so a key of
+// "__proto__" becomes a real own property instead of mutating the prototype.
+function defineOwn(target: object, key: string | symbol, value: unknown): void {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
 export function decode(bytes: Uint8Array): unknown {
   const r = new ByteReader(bytes);
   const magic = r.bytes(MAGIC.length);
@@ -98,7 +128,7 @@ function readNode(r: ByteReader): DecodedNode {
           for (const p of props) {
             const k =
               p.kind === KeyKind.String ? (p.key as string) : (resolve(p.key as number) as symbol);
-            obj[k] = resolve(p.val);
+            defineOwn(obj, k, resolve(p.val));
           }
         },
       };
@@ -193,6 +223,50 @@ function readNode(r: ByteReader): DecodedNode {
       const source = r.str();
       const flags = r.str();
       return { value: new RegExp(source, flags) };
+    }
+    case Tag.Url: {
+      return { value: new URL(r.str()) };
+    }
+    case Tag.DataView: {
+      const len = r.uvarintNum();
+      const raw = r.bytes(len);
+      const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + len) as ArrayBuffer;
+      return { value: new DataView(buf) };
+    }
+    case Tag.Error: {
+      const name = r.str();
+      const message = r.str();
+      const flags = r.u8();
+      const hasCause = (flags & 1) !== 0;
+      const causeRef = hasCause ? r.uvarintNum() : -1;
+      const n = r.uvarintNum();
+      const props: Array<{ kind: KeyKind; key: string | number; val: number }> = [];
+      for (let i = 0; i < n; i++) {
+        const kind = r.u8() as KeyKind;
+        const key = kind === KeyKind.String ? r.str() : r.uvarintNum();
+        const val = r.uvarintNum();
+        props.push({ kind, key, val });
+      }
+      const err = makeError(name, message);
+      return {
+        value: err,
+        fill: (resolve) => {
+          if (hasCause) {
+            // Match the ECMAScript `{ cause }` option: own, non-enumerable.
+            Object.defineProperty(err, "cause", {
+              value: resolve(causeRef),
+              writable: true,
+              configurable: true,
+              enumerable: false,
+            });
+          }
+          for (const p of props) {
+            const k =
+              p.kind === KeyKind.String ? (p.key as string) : (resolve(p.key as number) as symbol);
+            defineOwn(err, k, resolve(p.val));
+          }
+        },
+      };
     }
     default:
       throw new Error("unknown tag: " + tag);

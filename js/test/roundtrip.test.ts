@@ -225,3 +225,112 @@ describe("RegExp", () => {
     expect(idOut.a === idOut.b && idOut.a.source === "shared" && idOut.a.flags === "g").toBe(true);
   });
 });
+
+describe("dangerous own keys", () => {
+  it('"__proto__" stays an own data property, not the prototype', () => {
+    const v: Record<string, unknown> = {};
+    Object.defineProperty(v, "__proto__", {
+      value: { a: 1 },
+      enumerable: true,
+      configurable: true,
+    });
+    const out = decode(encode(v)) as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(out, "__proto__")).toBe(true);
+    expect((out["__proto__"] as { a: number }).a).toBe(1);
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+  });
+});
+
+describe("URL", () => {
+  const root = {
+    full: new URL("https://user:pw@example.com:8443/a/b?q=1&r=2#frag"),
+    simple: new URL("http://x.test/"),
+  };
+  const out = decode(encode(root)) as typeof root;
+
+  it("type & href preserved", () =>
+    expect(
+      out.full instanceof URL &&
+        out.full.href === "https://user:pw@example.com:8443/a/b?q=1&r=2#frag",
+    ).toBe(true));
+  it("parses components", () =>
+    expect(out.full.hostname === "example.com" && out.full.searchParams.get("q") === "1").toBe(
+      true,
+    ));
+  it("shared identity preserved", () => {
+    const u = new URL("https://shared.test/p");
+    const o = decode(encode({ a: u, b: u })) as { a: URL; b: URL };
+    expect(o.a === o.b && o.a.href === "https://shared.test/p").toBe(true);
+  });
+});
+
+describe("DataView", () => {
+  it("roundtrips type & viewed bytes", () => {
+    const buf = new ArrayBuffer(8);
+    const dv = new DataView(buf, 2, 4);
+    dv.setUint32(0, 0xdeadbeef);
+    const out = decode(encode({ dv })) as { dv: DataView };
+    expect(out.dv instanceof DataView && out.dv.byteLength === 4).toBe(true);
+    expect(out.dv.getUint32(0)).toBe(0xdeadbeef);
+  });
+  it("empty DataView", () => {
+    const out = decode(encode({ dv: new DataView(new ArrayBuffer(0)) })) as { dv: DataView };
+    expect(out.dv instanceof DataView && out.dv.byteLength === 0).toBe(true);
+  });
+});
+
+describe("Error", () => {
+  it("base Error: name & message", () => {
+    const out = decode(encode({ e: new Error("boom") })) as { e: Error };
+    expect(out.e instanceof Error && out.e.name === "Error" && out.e.message === "boom").toBe(true);
+  });
+  it("builtin subclass restored as that subclass", () => {
+    const out = decode(encode({ e: new TypeError("nope") })) as { e: TypeError };
+    expect(
+      out.e instanceof TypeError && out.e.name === "TypeError" && out.e.message === "nope",
+    ).toBe(true);
+  });
+  it("cause restored as non-enumerable", () => {
+    const out = decode(encode({ e: new Error("x", { cause: { code: 42 } }) })) as {
+      e: Error & { cause?: { code: number } };
+    };
+    expect(out.e.cause?.code === 42).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(out.e, "cause")?.enumerable).toBe(false);
+  });
+  it("extra own enumerable props preserved", () => {
+    const e = new Error("m") as Error & { code?: string };
+    e.code = "E_CUSTOM";
+    const out = decode(encode({ e })) as { e: Error & { code?: string } };
+    expect(out.e.code === "E_CUSTOM").toBe(true);
+  });
+  it("unknown name -> base Error with name set", () => {
+    const e = new Error("weird");
+    e.name = "CustomError";
+    const out = decode(encode({ e })) as { e: Error };
+    expect(
+      out.e instanceof Error && out.e.name === "CustomError" && out.e.message === "weird",
+    ).toBe(true);
+  });
+  it("cause sharing identity with another field", () => {
+    const shared = { id: 1 };
+    const e = new Error("m", { cause: shared });
+    const out = decode(encode({ e, ref: shared })) as {
+      e: Error & { cause?: unknown };
+      ref: unknown;
+    };
+    expect(out.e.cause === out.ref).toBe(true);
+  });
+});
+
+describe("boxed primitives unwrap to primitives (best-effort)", () => {
+  const out = decode(
+    encode({ n: new Number(42), f: new Number(3.5), s: new String("hi"), b: new Boolean(false) }),
+  ) as { n: number; f: number; s: string; b: boolean };
+  it("Number wrapper -> number", () =>
+    expect(out.n === 42 && typeof out.n === "number").toBe(true));
+  it("non-integral Number wrapper", () => expect(out.f).toBe(3.5));
+  it("String wrapper -> string", () =>
+    expect(out.s === "hi" && typeof out.s === "string").toBe(true));
+  it("Boolean wrapper -> boolean", () =>
+    expect(out.b === false && typeof out.b === "boolean").toBe(true));
+});
