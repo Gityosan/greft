@@ -1,0 +1,23 @@
+[package]
+name = "graft_native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# PoC only (see ../../bench/native-core/README.md). NOT a distribution target:
+# this crate exists to measure whether a native Rust decode core, called from
+# Python via PyO3, is fast enough to justify shipping a compiled dependency.
+# The wire-format primitives (varint / ZigZag / float-LE / UTF-8) are
+# hand-written and self-contained; the only dependency is the FFI glue itself.
+
+[lib]
+name = "graft_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
